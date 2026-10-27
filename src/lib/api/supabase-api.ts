@@ -1,0 +1,136 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { createClient, type PostgrestError } from '@supabase/supabase-js';
+import { Platform } from 'react-native';
+
+import { ApiError, type Api, type PendingRestaurant, type Restaurant } from './types';
+
+export function createSupabaseApi(url: string, key: string): Api {
+  const supabase = createClient(url, key, {
+    auth: {
+      // En web supabase-js usa localStorage por defecto.
+      storage: Platform.OS === 'web' ? undefined : AsyncStorage,
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: Platform.OS === 'web',
+    },
+  });
+
+  function fail(error: PostgrestError | { message: string; code?: string }): never {
+    if (error.code === '23505') throw new ApiError('Ese menú ya fue cargado por alguien más.');
+    if (error.code === 'P0001' || error.code === '42501') throw new ApiError(error.message);
+    if (error.code === '23514') throw new ApiError('Algún dato no es válido. Revisá el formulario.');
+    throw new ApiError('Algo salió mal. Probá de nuevo en un rato.');
+  }
+
+  function authFail(message: string): never {
+    if (/invalid login credentials/i.test(message)) throw new ApiError('Email o contraseña incorrectos.');
+    if (/email not confirmed/i.test(message)) throw new ApiError('Confirmá tu email antes de ingresar.');
+    if (/already registered/i.test(message)) throw new ApiError('Ese email ya tiene una cuenta.');
+    if (/password/i.test(message)) throw new ApiError('La contraseña debe tener al menos 6 caracteres.');
+    throw new ApiError(message);
+  }
+
+  return {
+    async listApproved() {
+      const { data, error } = await supabase
+        .from('restaurants')
+        .select('*')
+        .eq('status', 'approved')
+        .order('name');
+      if (error) fail(error);
+      return data as Restaurant[];
+    },
+
+    async listMine(userId) {
+      const { data, error } = await supabase
+        .from('restaurants')
+        .select('*')
+        .eq('submitted_by', userId)
+        .order('created_at', { ascending: false });
+      if (error) fail(error);
+      return data as Restaurant[];
+    },
+
+    async listPending() {
+      const { data, error } = await supabase
+        .from('restaurants')
+        .select('*, submitter:profiles!restaurants_submitted_by_fkey(username)')
+        .eq('status', 'pending')
+        .order('created_at');
+      if (error) fail(error);
+      return (data ?? []).map(({ submitter, ...r }) => ({
+        ...r,
+        submitter: (submitter as { username: string } | null)?.username ?? null,
+      })) as PendingRestaurant[];
+    },
+
+    async submit(input) {
+      const { data, error } = await supabase.from('restaurants').insert(input).select().single();
+      if (error) fail(error);
+      return data as Restaurant;
+    },
+
+    async withdraw(id) {
+      const { error } = await supabase.from('restaurants').delete().eq('id', id);
+      if (error) fail(error);
+    },
+
+    async review(id, decision, note) {
+      const { error } = await supabase.rpc('review_restaurant', {
+        p_id: id,
+        p_decision: decision,
+        p_note: note ?? null,
+      });
+      if (error) fail(error);
+    },
+
+    async getSession() {
+      const { data } = await supabase.auth.getSession();
+      const user = data.session?.user;
+      return user ? { userId: user.id, email: user.email ?? '' } : null;
+    },
+
+    onSessionChange(cb) {
+      const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+        const user = session?.user;
+        cb(user ? { userId: user.id, email: user.email ?? '' } : null);
+      });
+      return () => data.subscription.unsubscribe();
+    },
+
+    async getProfile(userId) {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, username, role, points')
+        .eq('id', userId)
+        .maybeSingle();
+      if (error) fail(error);
+      return data;
+    },
+
+    async signIn(email, password) {
+      const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+      if (error) authFail(error.message);
+    },
+
+    async signUp(email, username, password) {
+      const { data: available, error: rpcError } = await supabase.rpc('username_available', {
+        p_username: username,
+      });
+      if (rpcError) fail(rpcError);
+      if (!available) throw new ApiError('Ese nombre de usuario ya está en uso.');
+
+      const { data, error } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+        options: { data: { username } },
+      });
+      if (error) authFail(error.message);
+      return { needsConfirmation: !data.session };
+    },
+
+    async signOut() {
+      await supabase.auth.signOut();
+    },
+  };
+}

@@ -1,14 +1,15 @@
 {
   "expo": {
-    "name": "food-track-web",
-    "slug": "food-track-web",
+    "name": "FoodTrack",
+    "slug": "food-track",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "foodtrackweb",
-    "userInterfaceStyle": "automatic",
+    "scheme": "foodtrack",
+    "userInterfaceStyle": "light",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/expo.icon",
+      "bundleIdentifier": "com.g041.foodtrack"
     },
     "android": {
       "adaptiveIcon": {
@@ -17,20 +18,39 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.g041.foodtrack"
     },
     "web": {
-      "output": "server",
-      "favicon": "./assets/images/favicon.png"
+      "output": "single",
+      "favicon": "./assets/images/favicon.png",
+      "name": "FoodTrack",
+      "shortName": "FoodTrack",
+      "themeColor": "#E4572E",
+      "backgroundColor": "#FFF7EE",
+      "description": "Mapa colaborativo de menús QR"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
+          "backgroundColor": "#FFF7EE",
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "FoodTrack usa la cámara para leer el código QR del menú.",
+          "recordAudioAndroid": false
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "FoodTrack usa tu ubicación para mostrarte lugares cerca y ubicar los que aportás."
         }
       ]
     ],

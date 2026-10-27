@@ -1,56 +1,88 @@
-# Welcome to your Expo app 👋
+# FoodTrack (web)
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Mapa colaborativo de menús QR. Cualquiera encuentra lugares para comer en el mapa y abre su menú. Los usuarios registrados suman lugares escaneando el QR del menú (o pegando el link). **Cada aporte pasa por moderación** antes de publicarse.
 
-## Get started
+Es la v2 de [food-track](https://github.com/G041/food-track) + [food-track-backend](https://github.com/G041/food-track-backend). Está hecha con **Expo + React Native + Expo Router**: hoy se publica como app web, y el mismo código va a generar la app nativa más adelante.
 
-1. Install dependencies
+## Stack
 
-   ```bash
-   npm install
-   ```
+| | |
+|---|---|
+| App | Expo SDK 58, React Native 0.88 + react-native-web, Expo Router, TypeScript |
+| Datos | TanStack Query (servidor) + Zustand (filtros del mapa) |
+| Mapa (web) | MapLibre GL JS vía `react-map-gl/maplibre`, tiles de OpenFreeMap (sin API key) |
+| QR | `expo-camera` (`onBarcodeScanned`; en web requiere HTTPS) |
+| Backend | Supabase: Postgres + PostGIS, Auth, Row Level Security, funciones RPC |
+| Hosting | Vercel (web estática), Supabase Cloud (BD) |
 
-2. Start the app
+## Pantallas
 
-   ```bash
-   npx expo start
-   ```
+- **Mapa** (botón central, pantalla principal): pines por categoría, búsqueda sin acentos, filtro por categoría, ficha con "Ver menú" y "Cómo llegar".
+- **Aportar**: escanear el QR o pegar el link → nombre, categoría, dirección y ubicación en el mapa (por defecto, tu GPS) → *Enviar a revisión*.
+- **Perfil**: ingreso o registro, puntos, "Mis aportes" con su estado (En revisión / Publicado / Rechazado + motivo) y opción de retirar los pendientes.
+- **Moderación** (`/admin`, solo admins): cola de aportes pendientes con el link y un mapa de control, para aprobar o rechazar con motivo.
 
-In the output, you'll find options to open the app in a
+## Moderación: cómo está garantizada
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+Las reglas viven en la base (`supabase/migrations/20261027000000_init.sql`), no solo en la UI:
 
-You can start developing by editing the files inside the **src/app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+1. Un trigger `before insert` **fuerza `status = 'pending'`** y `submitted_by = auth.uid()`, sin importar lo que mande el cliente. Los aportes de un admin se publican directo.
+2. Las políticas RLS hacen que el público vea solo los `approved`. Cada usuario ve además sus propios aportes, y el admin ve todo.
+3. Solo la función `review_restaurant()` (que valida `is_admin()`) cambia el estado. Si se aprueba, suma 10 puntos a quien aportó.
+4. Si un usuario edita su aporte, vuelve a quedar pendiente. Solo puede editar o borrar mientras siga pendiente.
+5. Anti-spam: máximo 10 aportes por usuario cada 24 h, y un índice único sobre `menu_url` para que no se cargue dos veces el mismo menú.
 
-## Get a fresh project
-
-When you're ready, run:
+## Correr en local
 
 ```bash
-npm run reset-project
+npm install          # también copia el worker de MapLibre a public/
+npx expo start --web # http://localhost:8081
 ```
 
-This command will move the starter code to the **example** directory and create a blank **src/app** directory where you can start developing.
+Sin archivo `.env` la app arranca en **modo demo**: usa un backend simulado en el navegador (localStorage) con los 28 restaurantes de la v1. Para probar la moderación, entrá con `admin@foodtrack.demo` / `admin1234`.
 
-### Other setup steps
+Otros comandos: `npm run lint`, `npm run typecheck`, `npm run build:web` (genera `dist/`).
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+## Conectar Supabase (backend real)
 
-## Learn more
+1. Creá un proyecto en [supabase.com](https://supabase.com) (plan Free, región São Paulo).
+2. En **SQL Editor**, ejecutá en orden:
+   - `supabase/migrations/20261027000000_init.sql` (esquema, triggers, RLS, funciones)
+   - `supabase/seed.sql` (los 28 restaurantes de la v1, ya aprobados)
 
-To learn more about developing your project with Expo, look at the following resources:
+   Si preferís la CLI: `npx supabase link --project-ref <ref>` y después `npx supabase db push`.
+3. Copiá `.env.example` como `.env` con la URL y la key pública (*Project Settings → API*).
+4. Registrate desde la app y hacete admin en el SQL Editor:
+   ```sql
+   update public.profiles set role = 'admin' where username = 'TU_USUARIO';
+   ```
+5. Para desarrollo podés desactivar la confirmación por email en *Authentication → Providers → Email*.
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+> El plan Free pausa el proyecto tras 7 días sin actividad. Se reactiva desde el dashboard.
 
-## Join the community
+## Deploy (Vercel)
 
-Join our community of developers creating universal apps.
+Importá el repo en Vercel: `vercel.json` ya define el build (`npm run build:web`), la carpeta de salida (`dist`) y el rewrite SPA. Cargá `EXPO_PUBLIC_SUPABASE_URL` y `EXPO_PUBLIC_SUPABASE_KEY` como variables de entorno del proyecto.
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+## Estructura
+
+```
+src/
+  app/                      rutas (Expo Router)
+    (tabs)/                 aportar · index (mapa) · perfil
+    admin.tsx               moderación
+  components/
+    app-tabs.tsx            barra flotante con el mapa al centro
+    restaurant-map/         interfaz común + index.web.tsx (MapLibre) + index.tsx (nativo, pendiente)
+    qr-scanner.tsx, ui.tsx
+  features/                 auth, restaurants (queries + validación), map (filtros)
+  lib/api/                  interfaz Api + implementación Supabase + implementación demo
+  theme/tokens.ts           colores, espaciados, radios
+supabase/                   migraciones SQL y seed
+```
+
+## Próximos pasos
+
+- Probar el escaneo de QR en celulares reales (Chrome Android, Safari iOS) sobre HTTPS.
+- Implementar `restaurant-map/index.tsx` con `@maplibre/maplibre-react-native` para la app nativa.
+- "Cerca mío" usando la RPC `restaurants_nearby` (ya creada).

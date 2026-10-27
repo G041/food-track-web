@@ -8,19 +8,10 @@ Lo que sigue está ordenado por prioridad. Cada ítem es una casilla para tachar
 
 ## 🔴 1. Bloqueantes para usar la app de verdad
 
-- [ ] **Crear el proyecto Supabase y ejecutar el SQL.** Primero `supabase/migrations/20261027000000_init.sql` y después `supabase/seed.sql`. ⚠️ **El SQL nunca se ejecutó contra un Postgres real** (no había Docker para levantar Supabase local), así que puede necesitar ajustes. Los puntos más delicados:
-  - La columna generada `location` (PostGIS `geography`) calculada desde lat/lng.
-  - Los triggers `security definer` que usan `auth.uid()`.
-  - El `disable trigger` del seed.
-- [ ] **Probar las reglas de moderación en la base real:**
-  - Un anónimo no puede insertar.
-  - Un usuario no puede aprobar su propio aporte, ni con un `update` directo.
-  - Un usuario no ve los pendientes de otros.
-  - El admin puede aprobar y rechazar con `review_restaurant`.
-  - Al pasar 10 aportes en 24 h, se rechaza el siguiente.
-  - Un `menu_url` repetido se rechaza.
+- [ ] **Crear el proyecto Supabase y ejecutar el SQL** (`supabase/migrations/20261027000000_init.sql` y después `supabase/seed.sql`). Ya se validó en un Postgres local con PostGIS; falta aplicarlo en el proyecto real.
+- [x] **Reglas de moderación probadas** contra Postgres + PostGIS local (PGlite): 24 verificaciones en `supabase/tests/db.test.mjs` (`npm run test:db`, corre en la CI). Falta repetirlas una vez contra el proyecto Supabase real.
 - [ ] **Configurar `.env`** (`EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_KEY`) y nombrar el primer admin con `update public.profiles set role='admin' where username='…';`.
-- [ ] **Evitar el modo demo en producción por accidente.** Hoy, si faltan las variables de entorno, la app pasa sola a modo demo. En el deploy convendría que falle la build o que se muestre un error visible.
+- [x] **El modo demo ya no se activa solo en producción:** sin credenciales, la build publicada muestra "Falta configurar el backend". Para publicar una demo a propósito: `EXPO_PUBLIC_DEMO=true`.
 - [ ] **Deploy en Vercel.** Importar el repo y cargar las variables de entorno. En Supabase, configurar *Authentication → URL Configuration* (Site URL y Redirect URLs con el dominio de Vercel) para que los emails de confirmación lleven a la app.
 - [ ] **Escaneo de QR en celulares reales** (Chrome Android y Safari iOS) sobre HTTPS. Si `onBarcodeScanned` de `expo-camera` no detecta bien en web, hay que implementar un fallback con `@zxing/browser` en un `qr-scanner.web.tsx`.
 

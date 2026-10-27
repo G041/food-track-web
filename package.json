@@ -37,6 +37,8 @@
     "zustand": "^5.0.16"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.12",
+    "@electric-sql/pglite-postgis": "^0.2.12",
     "@types/react": "~19.3.0",
     "eslint": "^9.0.0",
     "eslint-config-expo": "~58.0.4",
@@ -50,7 +52,8 @@
     "lint": "expo lint",
     "postinstall": "node scripts/copy-maplibre-worker.js",
     "typecheck": "tsc --noEmit",
-    "build:web": "expo export -p web"
+    "build:web": "expo export -p web",
+    "test:db": "node supabase/tests/db.test.mjs"
   },
   "private": true
 }

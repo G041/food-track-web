@@ -41,7 +41,9 @@ npx expo start --web # http://localhost:8081
 
 Sin archivo `.env` la app arranca en **modo demo**: usa un backend simulado en el navegador (localStorage) con los 28 restaurantes de la v1. Para probar la moderación, entrá con `admin@foodtrack.demo` / `admin1234`.
 
-Otros comandos: `npm run lint`, `npm run typecheck`, `npm run build:web` (genera `dist/`).
+Otros comandos: `npm run lint`, `npm run typecheck`, `npm run test:db` (prueba el SQL en un Postgres local), `npm run build:web` (genera `dist/`).
+
+> **Al agregar dependencias desde Windows:** npm a veces saca del `package-lock.json` dependencias opcionales que Linux necesita (`@emnapi/*`), y la CI falla en `npm ci`. Verificalo antes de subir con `npm run check:lock`. Si falla, regenerá el lockfile completo: `rm -rf node_modules package-lock.json && npm install`.
 
 ## Conectar Supabase (backend real)
 

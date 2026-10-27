@@ -53,7 +53,8 @@
     "postinstall": "node scripts/copy-maplibre-worker.js",
     "typecheck": "tsc --noEmit",
     "build:web": "expo export -p web",
-    "test:db": "node supabase/tests/db.test.mjs"
+    "test:db": "node supabase/tests/db.test.mjs",
+    "check:lock": "npm ci --dry-run"
   },
   "private": true
 }

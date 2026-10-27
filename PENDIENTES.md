@@ -54,7 +54,7 @@ Lo que sigue está ordenado por prioridad. Cada ítem es una casilla para tachar
   - Unitarios de `validation.ts` y del filtro del mapa.
   - Tests de RLS en SQL.
   - Un e2e con Playwright en `e2e/` que reproduzca el flujo probado a mano: registro → aporte → aprobación → aparece en el mapa.
-- [ ] **Verificar que la CI pase en GitHub Actions.** La primera ejecución falló en `npm ci`: el `package-lock.json` estaba desincronizado y el `postinstall` fallaba en una copia limpia porque `public/` no existía. Ya está corregido; falta confirmar el primer run en verde.
+- [x] **CI en GitHub Actions en verde** (lint, typecheck y build). La primera ejecución fallaba en `npm ci` por el lockfile desincronizado y la carpeta `public/` faltante; se corrigió en `858bf1f`.
 - [ ] **Tipos generados** desde el esquema con `npx supabase gen types typescript` (hoy `src/lib/api/types.ts` está escrito a mano).
 - [ ] **Agregar `.gitattributes`** (`* text=auto eol=lf`) para evitar los avisos de LF/CRLF en Windows.
 - [ ] **Revisar `npm audit`** (hay avisos en dependencias transitivas).

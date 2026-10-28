@@ -5,6 +5,7 @@ import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
 import { AdminNotes } from '@/components/admin-notes';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { useDebugPanel } from '@/components/safe-area-debug';
 import { AppText, Button, Card, Notice, Screen, StatusBadge, TextField } from '@/components/ui';
 import { useAuth } from '@/features/auth/auth-provider';
 import { useMySubmissions, usePendingRestaurants, useWithdrawRestaurant } from '@/features/restaurants/queries';
@@ -72,6 +73,14 @@ function ProfileView() {
       )}
 
       {isAdmin && <AdminNotes />}
+      {isAdmin && (
+        <Button
+          title="Diagnóstico de pantalla"
+          icon="phone-portrait-outline"
+          variant="ghost"
+          onPress={() => useDebugPanel.getState().setVisible(true)}
+        />
+      )}
 
       <AppText variant="heading">Mis aportes</AppText>
       {isLoading ? (

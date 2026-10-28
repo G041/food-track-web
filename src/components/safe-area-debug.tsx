@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { create } from 'zustand';
 
 import { isIosStandalone, useHeaderOffset, useStatusBarInset, useTabBarBottom } from '@/hooks/use-header-offset';
 
@@ -29,16 +30,20 @@ function measureEnv(): Probe {
   };
 }
 
-/** Panel de diagnóstico: abrir la app con ?debug=1. Muestra las zonas seguras reales del dispositivo. */
+/** Visibilidad del panel: se abre con ?debug=1 o desde Perfil (admins), útil en la app instalada. */
+export const useDebugPanel = create<{ visible: boolean; setVisible: (v: boolean) => void }>((set) => ({
+  visible: Platform.OS === 'web' && typeof location !== 'undefined' && new URLSearchParams(location.search).has('debug'),
+  setVisible: (visible) => set({ visible }),
+}));
+
+/** Panel de diagnóstico: muestra las zonas seguras y medidas reales del dispositivo. */
 export function SafeAreaDebug() {
   const insets = useSafeAreaInsets();
   const header = useHeaderOffset();
   const statusBar = useStatusBarInset();
   const barBottom = useTabBarBottom();
   const [env, setEnv] = useState<Probe | null>(null);
-  const [visible, setVisible] = useState(
-    () => Platform.OS === 'web' && typeof location !== 'undefined' && new URLSearchParams(location.search).has('debug'),
-  );
+  const { visible, setVisible } = useDebugPanel();
 
   useEffect(() => {
     if (!visible) return;

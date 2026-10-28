@@ -6,24 +6,17 @@ import { colors } from '@/theme/tokens';
 
 /**
  * Franja detrás de la hora/batería cuando la barra de estado es transparente (app instalada en iOS).
- * En oscuro toma el fondo de la app (todo negro); en claro va en naranja, porque iOS escribe
- * la hora siempre en blanco en este modo y sobre el fondo crema no se leería.
+ * En oscuro no se dibuja nada: el contenido (mapa, fondo) pasa por detrás de la hora, que iOS
+ * escribe en blanco. En claro va en naranja, porque la hora blanca no se leería sobre el crema.
  */
 export function StatusBarScrim() {
   const height = useStatusBarInset();
   const theme = useResolvedTheme();
-  if (height === 0) return null;
+  if (height === 0 || theme === 'dark') return null;
   return (
     <View
       pointerEvents="none"
-      style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        height,
-        backgroundColor: theme === 'dark' ? colors.bg : colors.primary,
-      }}
+      style={{ position: 'absolute', top: 0, left: 0, right: 0, height, backgroundColor: colors.primary }}
     />
   );
 }

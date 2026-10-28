@@ -71,7 +71,7 @@ export default function AportarScreen() {
             text="Si ya tenés la URL del menú digital."
             onPress={() => setStep('link')}
           />
-          {!isAdmin && <HowItWorks />}
+          <HowItWorks />
         </>
       )}
 

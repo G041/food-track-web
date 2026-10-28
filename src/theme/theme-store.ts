@@ -44,6 +44,10 @@ export function useApplyTheme() {
     if (Platform.OS !== 'web' || typeof document === 'undefined') return;
     document.documentElement.setAttribute('data-theme', theme);
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', palettes[theme].bg);
+    // iOS lee este estilo al abrir la app: un cambio de tema se ve en la barra de estado al reabrirla.
+    document
+      .querySelector('meta[name="apple-mobile-web-app-status-bar-style"]')
+      ?.setAttribute('content', theme === 'dark' ? 'black' : 'default');
   }, [theme]);
   return theme;
 }

@@ -29,7 +29,7 @@ Lo que sigue está ordenado por prioridad. Cada ítem es una casilla para tachar
 - [x] Confirmación al cerrar sesión y al retirar un aporte (`ConfirmDialog`).
 - [x] Animaciones de navegación: entrada de pantallas, pestañas, ficha del lugar, resultados y categorías (`src/components/motion.tsx`).
 - [x] Tema claro, oscuro o el del sistema (Perfil → Apariencia), incluido el mapa. En web usa variables CSS; en nativo, por ahora, solo el claro.
-- [x] **Posición de los HUD por zonas seguras** (`src/hooks/use-header-offset.ts`): encabezado = `safe-area-inset-top` + 12px; barra de tabs = 12px + (inset inferior − 20px). La barra de estado de iOS pasó a `default` (opaca) porque iOS reciente reporta `env(safe-area-inset-top)` en 0 con `black-translucent`. Diagnóstico en el dispositivo: abrir la app con `?debug=1`.
+- [x] **Posición de los HUD por zonas seguras** (`src/hooks/use-header-offset.ts`): encabezado = alto de la barra de estado + 12px; barra de tabs = 12px + (inset inferior − 20px). En iOS instalada, la barra de estado es `black-translucent` (la app pinta esa franja: fondo en oscuro, naranja en claro, `status-bar-scrim.tsx`); como iOS reciente informa `safe-area-inset-top` = 0, el alto se estima por tamaño de pantalla (59/48/20px). iOS toma el estilo al **agregar** la app al inicio: si cambia, hay que borrarla y volver a agregarla. Diagnóstico: `?debug=1`.
 - [x] Usuarios mostrados como `@Usuario` (primera letra en mayúscula) en todos lados (`displayUsername`).
 - [x] Contraseña: botón para verla u ocultarla; tras un login fallido, la primera tecla de borrar la vacía entera; al crear cuenta se pide repetirla.
 - [x] **Notas del equipo** (solo admins) en Perfil: tabla `admin_notes` con RLS (migración `20261028000000`), crear, marcar como hecha y borrar.

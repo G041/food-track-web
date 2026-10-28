@@ -17,10 +17,10 @@
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="FoodTrack" />
-    <!-- Barra de estado de iOS opaca (reserva su espacio, como Android): "default" (blanca) en tema
-         claro y "black" en oscuro; el script de abajo elige según el tema. No se usa "black-translucent"
-         porque el contenido pasa por debajo y depende de env(safe-area-inset-top), que iOS reciente reporta en 0. -->
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <!-- Barra de estado de iOS transparente: la app se dibuja debajo de la hora y pinta esa franja
+         con su propio color (fondo en oscuro, naranja en claro). iOS toma este valor al AGREGAR la app
+         a la pantalla de inicio: si cambia, hay que borrarla y volver a agregarla. -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
     <meta name="theme-color" content="#FFF7EE" />
     <meta name="format-detection" content="telephone=no" />
@@ -35,9 +35,6 @@
         var dark = pref === 'dark' || (pref === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
         document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
         document.querySelector('meta[name="theme-color"]').setAttribute('content', dark ? '#14110F' : '#FFF7EE');
-        document
-          .querySelector('meta[name="apple-mobile-web-app-status-bar-style"]')
-          .setAttribute('content', dark ? 'black' : 'default');
       })();
     </script>
 

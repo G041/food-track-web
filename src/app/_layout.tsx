@@ -5,6 +5,7 @@ import { useState } from 'react';
 
 import MenuModal from '@/components/menu-modal';
 import { SafeAreaDebug } from '@/components/safe-area-debug';
+import { StatusBarScrim } from '@/components/status-bar-scrim';
 import { AppText, Notice, Screen } from '@/components/ui';
 import { AuthProvider } from '@/features/auth/auth-provider';
 import { isMisconfigured } from '@/lib/api';
@@ -41,6 +42,7 @@ export default function RootLayout() {
           <Stack.Screen name="admin" options={{ title: 'Moderación' }} />
         </Stack>
         <MenuModal />
+        <StatusBarScrim />
         <SafeAreaDebug />
       </AuthProvider>
     </QueryClientProvider>

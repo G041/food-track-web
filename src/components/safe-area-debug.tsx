@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { useHeaderOffset, useTabBarBottom } from '@/hooks/use-header-offset';
+import { isIosStandalone, useHeaderOffset, useStatusBarInset, useTabBarBottom } from '@/hooks/use-header-offset';
 
 type Probe = Record<string, string | number | boolean>;
 
@@ -33,6 +33,7 @@ function measureEnv(): Probe {
 export function SafeAreaDebug() {
   const insets = useSafeAreaInsets();
   const header = useHeaderOffset();
+  const statusBar = useStatusBarInset();
   const barBottom = useTabBarBottom();
   const [env, setEnv] = useState<Probe | null>(null);
   const [visible, setVisible] = useState(
@@ -50,6 +51,7 @@ export function SafeAreaDebug() {
   if (!visible) return null;
   const rows: Probe = {
     'lib top/bottom': `${insets.top} / ${insets.bottom}`,
+    'barra de estado': `${statusBar}px${isIosStandalone() && insets.top === 0 ? ' (estimada)' : ''}`,
     'header en': `${header}px`,
     'barra en': `${barBottom}px del borde`,
     ...env,

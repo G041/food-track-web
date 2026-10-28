@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
+import { AdminNotes } from '@/components/admin-notes';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { AppText, Button, Card, Notice, Screen, StatusBadge, TextField } from '@/components/ui';
 import { useAuth } from '@/features/auth/auth-provider';
@@ -69,6 +70,8 @@ function ProfileView() {
           <Ionicons name="chevron-forward" size={22} color={colors.inverseFg} />
         </Pressable>
       )}
+
+      {isAdmin && <AdminNotes />}
 
       <AppText variant="heading">Mis aportes</AppText>
       {isLoading ? (
@@ -191,6 +194,9 @@ function AuthForm() {
   const [email, setEmail] = useState(''); // en login: email o nombre de usuario
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [password2, setPassword2] = useState('');
+  // Tras un login fallido, la primera tecla de borrar vacía toda la contraseña (como en iOS).
+  const [clearOnBackspace, setClearOnBackspace] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -208,6 +214,7 @@ function AuthForm() {
       return setError('El usuario debe tener entre 4 y 15 caracteres (letras, números, punto o guion bajo).');
     }
     if (password.length < 6) return setError('La contraseña debe tener al menos 6 caracteres.');
+    if (mode === 'signup' && password !== password2) return setError('Las contraseñas no coinciden.');
 
     setLoading(true);
     try {
@@ -222,6 +229,7 @@ function AuthForm() {
       }
     } catch (e) {
       setError((e as Error).message);
+      if (mode === 'login') setClearOnBackspace(true);
     } finally {
       setLoading(false);
     }
@@ -241,6 +249,8 @@ function AuthForm() {
             onPress={() => {
               setMode(m);
               setError(null);
+              setPassword2('');
+              setClearOnBackspace(false);
             }}
             style={[styles.segmentItem, mode === m && styles.segmentActive]}>
             <AppText style={[styles.segmentText, mode === m && { color: colors.ink }]}>
@@ -277,12 +287,37 @@ function AuthForm() {
           label="Contraseña"
           icon="lock-closed-outline"
           value={password}
-          onChangeText={setPassword}
+          onChangeText={(v) => {
+            setPassword(v);
+            setClearOnBackspace(false);
+          }}
+          onKeyPress={(e) => {
+            if (clearOnBackspace && e.nativeEvent.key === 'Backspace') {
+              e.preventDefault();
+              setPassword('');
+              setClearOnBackspace(false);
+            }
+          }}
           secureTextEntry
+          secureToggle
           autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
           placeholder="Mínimo 6 caracteres"
-          onSubmitEditing={submit}
+          onSubmitEditing={mode === 'login' ? submit : undefined}
         />
+        {mode === 'signup' && (
+          <TextField
+            label="Repetir contraseña"
+            icon="lock-closed-outline"
+            value={password2}
+            onChangeText={setPassword2}
+            secureTextEntry
+            secureToggle
+            autoComplete="new-password"
+            placeholder="Escribila de nuevo"
+            onSubmitEditing={submit}
+            error={password2.length > 0 && password2 !== password.slice(0, password2.length) ? 'No coincide con la contraseña.' : undefined}
+          />
+        )}
         {error && <Notice tone="error">{error}</Notice>}
         {info && <Notice tone="success">{info}</Notice>}
         <Button title={mode === 'login' ? 'Ingresar' : 'Crear cuenta'} loading={loading} onPress={submit} />

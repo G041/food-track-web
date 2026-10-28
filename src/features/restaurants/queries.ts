@@ -36,6 +36,22 @@ export function useWithdrawRestaurant() {
   return useMutation({ mutationFn: (id: number) => api.withdraw(id), onSuccess });
 }
 
+export function useAdminNotes(enabled: boolean) {
+  return useQuery({ queryKey: ['admin-notes'], queryFn: api.listNotes, enabled });
+}
+
+function useNotesMutation<T>(fn: (v: T) => Promise<void>) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: fn,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-notes'] }),
+  });
+}
+
+export const useAddNote = () => useNotesMutation((body: string) => api.addNote(body));
+export const useSetNoteDone = () => useNotesMutation((v: { id: number; done: boolean }) => api.setNoteDone(v.id, v.done));
+export const useDeleteNote = () => useNotesMutation((id: number) => api.deleteNote(id));
+
 export function useReviewRestaurant() {
   const onSuccess = useInvalidateRestaurants();
   return useMutation({

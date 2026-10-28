@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient, type PostgrestError } from '@supabase/supabase-js';
 import { Platform } from 'react-native';
 
-import { ApiError, type Api, type PendingRestaurant, type Restaurant } from './types';
+import { ApiError, type AdminNote, type Api, type PendingRestaurant, type Restaurant } from './types';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? '';
 
@@ -83,6 +83,33 @@ export function createSupabaseApi(url: string, key: string): Api {
         p_decision: decision,
         p_note: note ?? null,
       });
+      if (error) fail(error);
+    },
+
+    async listNotes() {
+      const { data, error } = await supabase
+        .from('admin_notes')
+        .select('id, body, done, created_at, author:profiles!admin_notes_created_by_fkey(username)')
+        .order('created_at', { ascending: false });
+      if (error) fail(error);
+      return (data ?? []).map(({ author, ...n }) => ({
+        ...n,
+        author: (author as unknown as { username: string } | null)?.username ?? null,
+      })) as AdminNote[];
+    },
+
+    async addNote(body) {
+      const { error } = await supabase.from('admin_notes').insert({ body: body.trim() });
+      if (error) fail(error);
+    },
+
+    async setNoteDone(id, done) {
+      const { error } = await supabase.from('admin_notes').update({ done }).eq('id', id);
+      if (error) fail(error);
+    },
+
+    async deleteNote(id) {
+      const { error } = await supabase.from('admin_notes').delete().eq('id', id);
       if (error) fail(error);
     },
 

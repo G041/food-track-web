@@ -1,9 +1,15 @@
 // Backend simulado para probar la app sin Supabase. Guarda todo en localStorage (web).
 import { seedRestaurants } from './seed-data';
-import { ApiError, type Api, type Profile, type Restaurant, type Session } from './types';
+import { ApiError, type AdminNote, type Api, type Profile, type Restaurant, type Session } from './types';
 
 type DemoUser = Profile & { email: string; password: string };
-type DemoState = { restaurants: Restaurant[]; users: DemoUser[]; session: Session | null; nextId: number };
+type DemoState = {
+  restaurants: Restaurant[];
+  users: DemoUser[];
+  session: Session | null;
+  nextId: number;
+  notes?: AdminNote[];
+};
 
 const STORAGE_KEY = 'foodtrack-demo-v1';
 export const DEMO_ADMIN = { email: 'admin@foodtrack.demo', password: 'admin1234' };
@@ -115,6 +121,36 @@ export function createDemoApi(): Api {
       r.review_note = note?.trim() || null;
       const author = state.users.find((u) => u.id === r.submitted_by);
       if (decision === 'approved' && author) author.points += 10;
+      save();
+    },
+
+    async listNotes() {
+      await delay();
+      if (me()?.role !== 'admin') return [];
+      return [...(state.notes ?? [])].sort((a, b) => b.created_at.localeCompare(a.created_at));
+    },
+
+    async addNote(body) {
+      await delay();
+      const user = me();
+      if (user?.role !== 'admin') throw new ApiError('Solo los administradores pueden crear notas.');
+      if (!body.trim()) throw new ApiError('La nota está vacía.');
+      state.notes = [
+        ...(state.notes ?? []),
+        { id: Date.now(), body: body.trim(), done: false, created_at: new Date().toISOString(), author: user.username },
+      ];
+      save();
+    },
+
+    async setNoteDone(id, done) {
+      await delay();
+      state.notes = (state.notes ?? []).map((n) => (n.id === id ? { ...n, done } : n));
+      save();
+    },
+
+    async deleteNote(id) {
+      await delay();
+      state.notes = (state.notes ?? []).filter((n) => n.id !== id);
       save();
     },
 

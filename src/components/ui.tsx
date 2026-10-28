@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import type { ComponentProps, ReactNode } from 'react';
+import { useState, type ComponentProps, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -16,6 +16,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ScreenTransition } from '@/components/motion';
+import { useHeaderOffset } from '@/hooks/use-header-offset';
 import type { RestaurantStatus } from '@/lib/api';
 import { colors, font, MAX_CONTENT_WIDTH, radius, shadow, space, TAB_BAR_SPACE } from '@/theme/tokens';
 
@@ -32,13 +33,14 @@ export function AppText({
 /** Pantalla con scroll, ancho máximo centrado y espacio para la barra de tabs. */
 export function Screen({ children, tabBar = true }: { children: ReactNode; tabBar?: boolean }) {
   const insets = useSafeAreaInsets();
+  const top = useHeaderOffset();
   return (
     <ScrollView
       style={styles.screen}
       keyboardShouldPersistTaps="handled"
       contentContainerStyle={[
         styles.screenContent,
-        { paddingTop: insets.top + space.xl, paddingBottom: (tabBar ? TAB_BAR_SPACE : space.xl) + insets.bottom },
+        { paddingTop: top, paddingBottom: (tabBar ? TAB_BAR_SPACE : space.xl) + insets.bottom },
       ]}>
       <ScreenTransition style={styles.screenInner}>{children}</ScreenTransition>
     </ScrollView>
@@ -95,14 +97,31 @@ export function TextField({
   label,
   error,
   icon,
+  secureToggle,
+  secureTextEntry,
   ...props
-}: TextInputProps & { label?: string; error?: string; icon?: IconName }) {
+}: TextInputProps & { label?: string; error?: string; icon?: IconName; /** Muestra un ojo para ver/ocultar la contraseña. */ secureToggle?: boolean }) {
+  const [reveal, setReveal] = useState(false);
   return (
     <View style={styles.field}>
       {label && <AppText variant="label">{label}</AppText>}
       <View style={[styles.inputWrap, !!error && styles.inputError]}>
         {icon && <Ionicons name={icon} size={18} color={colors.inkMuted} />}
-        <TextInput placeholderTextColor={colors.inkMuted} {...props} style={[styles.text, styles.input]} />
+        <TextInput
+          placeholderTextColor={colors.inkMuted}
+          {...props}
+          secureTextEntry={secureTextEntry && !reveal}
+          style={[styles.text, styles.input]}
+        />
+        {secureToggle && (
+          <Pressable
+            onPress={() => setReveal((r) => !r)}
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel={reveal ? 'Ocultar contraseña' : 'Mostrar contraseña'}>
+            <Ionicons name={reveal ? 'eye-off-outline' : 'eye-outline'} size={20} color={colors.inkSoft} />
+          </Pressable>
+        )}
       </View>
       {error && <AppText style={styles.errorText}>{error}</AppText>}
     </View>

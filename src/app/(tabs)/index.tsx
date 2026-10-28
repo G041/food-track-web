@@ -8,6 +8,7 @@ import RestaurantMap, { type MapMarker } from '@/components/restaurant-map';
 import { AppText, Button, Chip } from '@/components/ui';
 import { useMapFilters } from '@/features/map/filters-store';
 import { useApprovedRestaurants } from '@/features/restaurants/queries';
+import { useHeaderOffset } from '@/hooks/use-header-offset';
 import { DEFAULT_CENTER, useUserLocation, type LatLng } from '@/hooks/use-user-location';
 import { isDemo, type Restaurant } from '@/lib/api';
 import { CATEGORIES, categoryMeta } from '@/lib/categories';
@@ -18,6 +19,7 @@ import { colors, font, MAX_CONTENT_WIDTH, radius, shadow, space, TAB_BAR_SPACE }
 
 export default function MapScreen() {
   const insets = useSafeAreaInsets();
+  const headerTop = useHeaderOffset();
   const { data: restaurants = [], isLoading, isError, refetch } = useApprovedRestaurants();
   const { search, setSearch, category, setCategory, selectedId, select } = useMapFilters();
   const { location, denied, locate } = useUserLocation();
@@ -76,7 +78,7 @@ export default function MapScreen() {
       />
 
       {/* Búsqueda + categorías */}
-      <View style={[styles.top, { paddingTop: insets.top + space.md }]} pointerEvents="box-none">
+      <View style={[styles.top, { paddingTop: headerTop }]} pointerEvents="box-none">
         <View style={styles.topInner} pointerEvents="box-none">
           <View style={styles.searchBox}>
             <Ionicons name="search" size={20} color={colors.inkSoft} />

@@ -1,7 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useState, type ComponentProps } from 'react';
 import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText, Button } from '@/components/ui';
 import { useMenuViewer, type MenuTarget } from '@/features/menu/menu-store';
@@ -9,6 +8,7 @@ import { useMenuPreview, type MenuPreview } from '@/features/menu/use-menu-previ
 import { categoryMeta } from '@/lib/categories';
 import { openMenu } from '@/lib/links';
 import { setPageZoomEnabled } from '@/lib/page-zoom';
+import { useHeaderOffset } from '@/hooks/use-header-offset';
 import { colors, font, radius, shadow, space } from '@/theme/tokens';
 
 import MenuFrame from './menu-frame';
@@ -35,7 +35,7 @@ export default function MenuModal() {
 type Phase = 'checking' | 'loading' | 'loaded' | 'slow' | 'blocked' | 'broken' | 'unreachable' | 'invalid';
 
 function MenuSheet({ target, onClose }: { target: MenuTarget; onClose: () => void }) {
-  const insets = useSafeAreaInsets();
+  const top = useHeaderOffset();
   const { width } = useWindowDimensions();
   const wide = width >= WIDE;
   const { data: preview, isLoading } = useMenuPreview(target.url);
@@ -69,7 +69,7 @@ function MenuSheet({ target, onClose }: { target: MenuTarget; onClose: () => voi
   return (
     <View style={[styles.backdrop, wide && styles.backdropWide]}>
       <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Cerrar menú" />
-      <View style={[styles.sheet, wide ? styles.sheetWide : { marginTop: insets.top + space.lg }]}>
+      <View style={[styles.sheet, wide ? styles.sheetWide : { marginTop: top }]}>
         <View style={styles.header}>
           <View style={[styles.icon, { backgroundColor: meta.color }]}>
             <Ionicons name={meta.icon} size={20} color="#fff" />

@@ -20,8 +20,13 @@ const log = (step: string, detail?: string) => console.log(`[api/login] ${step}$
 export async function POST(request: Request) {
   const url = process.env.EXPO_PUBLIC_SUPABASE_URL;
   const publicKey = process.env.EXPO_PUBLIC_SUPABASE_KEY;
-  const secretKey = process.env.SUPABASE_SECRET_KEY;
+  const secretKey = process.env.SUPABASE_SECRET_KEY?.trim();
   if (!url || !publicKey || !secretKey) return json({ error: 'El login con usuario no está configurado.' }, 503);
+  // Una clave copiada enmascarada ("sb_secret_abc•••") o con caracteres invisibles rompe los headers HTTP.
+  if (!/^[\x21-\x7e]+$/.test(secretKey)) {
+    log('secret_key_invalid', 'SUPABASE_SECRET_KEY tiene caracteres no ASCII: volver a copiarla desde Supabase (revelada)');
+    return json({ error: 'El login con usuario no está bien configurado. Por ahora ingresá con tu email.' }, 503);
+  }
 
   const body = (await request.json().catch(() => null)) as { username?: unknown; password?: unknown } | null;
   const username = typeof body?.username === 'string' ? body.username.trim() : '';

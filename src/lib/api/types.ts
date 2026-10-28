@@ -37,6 +37,15 @@ export type Session = { userId: string; email: string };
 
 export type ReviewDecision = 'approved' | 'rejected';
 
+/** Nota interna del equipo (solo admins). */
+export type AdminNote = {
+  id: number;
+  body: string;
+  done: boolean;
+  created_at: string;
+  author: string | null;
+};
+
 export interface Api {
   listApproved(): Promise<Restaurant[]>;
   listMine(userId: string): Promise<Restaurant[]>;
@@ -44,6 +53,11 @@ export interface Api {
   submit(input: NewRestaurant): Promise<Restaurant>;
   withdraw(id: number): Promise<void>;
   review(id: number, decision: ReviewDecision, note?: string): Promise<void>;
+
+  listNotes(): Promise<AdminNote[]>;
+  addNote(body: string): Promise<void>;
+  setNoteDone(id: number, done: boolean): Promise<void>;
+  deleteNote(id: number): Promise<void>;
 
   getSession(): Promise<Session | null>;
   onSessionChange(cb: (session: Session | null) => void): () => void;

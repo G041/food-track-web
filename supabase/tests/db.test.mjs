@@ -94,5 +94,19 @@ ok(near.length > 0 && near.length < 28, `restaurants_nearby devuelve los cercano
 const bad = await err(() => ins(alice, 'javascript:alert(1)'));
 ok(bad?.code === '23514', 'menu_url que no es http(s) se rechaza');
 
+// ── Notas de admin ──
+const addNote = (uid, body) => as(uid, () => q(`insert into admin_notes (body) values ($1) returning *`, [body]));
+ok((await as(null, () => q(`select count(*)::int n from admin_notes`)))[0].n === 0, 'anónimo no ve notas');
+ok(!!(await err(() => addNote(alice, 'idea de alice'))), 'usuario común no puede crear notas');
+const [note] = await addNote(admin, 'Sumar modo admin');
+ok(note.created_by === admin && note.done === false, 'admin crea nota con autor automático');
+ok((await as(alice, () => q(`select count(*)::int n from admin_notes`)))[0].n === 0, 'usuario común no ve notas');
+ok((await as(alice, () => q(`update admin_notes set done = true where id = $1 returning id`, [note.id]))).length === 0, 'usuario común no puede editar notas');
+await as(admin, () => q(`update admin_notes set done = true where id = $1`, [note.id]));
+ok((await q(`select done from admin_notes where id = $1`, [note.id]))[0].done === true, 'admin marca nota como hecha');
+ok(!!(await err(() => as(admin, () => q(`insert into admin_notes (body, created_by) values ('x', $1)`, [alice])))), 'no se puede crear una nota a nombre de otro');
+ok(!!(await err(() => addNote(admin, '   '))), 'nota vacía se rechaza');
+ok((await as(admin, () => q(`delete from admin_notes where id = $1 returning id`, [note.id]))).length === 1, 'admin borra nota');
+
 console.log(fails ? `\n${fails} FALLAS` : '\nTODO OK');
 process.exit(fails ? 1 : 0);

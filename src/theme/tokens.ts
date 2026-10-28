@@ -107,6 +107,4 @@ export const shadow: ViewStyle = Platform.select<ViewStyle>({
   },
 })!;
 
-/** Alto que ocupa la barra de tabs flotante, para dejar espacio debajo del contenido. */
-export const TAB_BAR_SPACE = 112;
 export const MAX_CONTENT_WIDTH = 560;

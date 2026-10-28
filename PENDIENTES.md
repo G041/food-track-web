@@ -11,7 +11,7 @@ Lo que sigue está ordenado por prioridad. Cada ítem es una casilla para tachar
 - [x] **Base en Supabase** (proyecto `shqlyaqbymsngvakpwyw`, us-east-1): esquema y 28 restaurantes aplicados con `supabase db push --include-seed`. Verificado vía API: anónimo ve 28 aprobados, no puede insertar ni moderar, `restaurants_nearby` responde.
 - [x] **Reglas de moderación probadas** contra Postgres + PostGIS local (PGlite): 24 verificaciones en `supabase/tests/db.test.mjs` (`npm run test:db`, corre en la CI). Falta repetirlas una vez contra el proyecto Supabase real.
 - [x] **Primer admin:** la cuenta `gianni` es admin (28/10/2026). Para sumar otro: `npx supabase db query --linked "update public.profiles set role='admin' where username='…'"`.
-- [ ] **Corregir `SUPABASE_SECRET_KEY` en Vercel:** el valor cargado tiene caracteres no ASCII (probablemente se copió la versión enmascarada `sb_secret_…•••`). Hay que revelar la clave en Supabase (*Project Settings → API Keys → Secret keys → ícono del ojo*), copiarla completa, reemplazar el valor en Vercel y volver a publicar. Hasta entonces, `api/login` responde 503 y solo funciona el login con email.
+- [x] **Login con nombre de usuario funcionando en producción** (28/10/2026), tras recargar `SUPABASE_SECRET_KEY` revelada. `api/login` registra en los logs de Vercel en qué paso falla cada intento.
 - [x] **El modo demo ya no se activa solo en producción:** sin credenciales, la build publicada muestra "Falta configurar el backend". Para publicar una demo a propósito: `EXPO_PUBLIC_DEMO=true`.
 - [x] **Deploy en Vercel:** https://food-track-web.vercel.app (proyecto `food-track2/food-track-web`, deploy automático en cada push a `main`, variables `EXPO_PUBLIC_SUPABASE_URL`/`KEY` cargadas en Production y Preview).
 - [x] **Supabase Auth → URL Configuration:** Site URL = `https://food-track-web.vercel.app` y Redirect URL `https://food-track-web.vercel.app/**`.
@@ -29,7 +29,8 @@ Lo que sigue está ordenado por prioridad. Cada ítem es una casilla para tachar
 - [x] Confirmación al cerrar sesión y al retirar un aporte (`ConfirmDialog`).
 - [x] Animaciones de navegación: entrada de pantallas, pestañas, ficha del lugar, resultados y categorías (`src/components/motion.tsx`).
 - [x] Tema claro, oscuro o el del sistema (Perfil → Apariencia), incluido el mapa. En web usa variables CSS; en nativo, por ahora, solo el claro.
-- [x] Margen superior dinámico: el "header" de cada pantalla, el del mapa y el del modal arrancan al ~10% del alto de pantalla (`useHeaderOffset`).
+- [x] **Posición de los HUD por zonas seguras** (`src/hooks/use-header-offset.ts`): encabezado = `safe-area-inset-top` + 12px; barra de tabs = 12px + (inset inferior − 20px). La barra de estado de iOS pasó a `default` (opaca) porque iOS reciente reporta `env(safe-area-inset-top)` en 0 con `black-translucent`. Diagnóstico en el dispositivo: abrir la app con `?debug=1`.
+- [x] Usuarios mostrados como `@Usuario` (primera letra en mayúscula) en todos lados (`displayUsername`).
 - [x] Contraseña: botón para verla u ocultarla; tras un login fallido, la primera tecla de borrar la vacía entera; al crear cuenta se pide repetirla.
 - [x] **Notas del equipo** (solo admins) en Perfil: tabla `admin_notes` con RLS (migración `20261028000000`), crear, marcar como hecha y borrar.
 - [ ] **Probar en iPhone y Android instalada** (Compartir → "Agregar a inicio" / menú → "Instalar app"): zoom, barra de estado, teclado y cámara.

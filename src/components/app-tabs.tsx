@@ -2,11 +2,11 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { TabList, TabSlot, TabTrigger, Tabs, type TabTriggerSlotProps } from 'expo-router/ui';
 import { useEffect, useState, type ComponentProps } from 'react';
 import { Animated, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { usePop } from '@/components/motion';
 import { useAuth } from '@/features/auth/auth-provider';
 import { usePendingRestaurants } from '@/features/restaurants/queries';
+import { TAB_BAR_HEIGHT, useTabBarBottom } from '@/hooks/use-header-offset';
 import { useKeyboardVisible } from '@/hooks/use-keyboard-visible';
 import { colors, font, radius, shadow, space } from '@/theme/tokens';
 
@@ -17,7 +17,7 @@ const native = Platform.OS !== 'web';
 // Barra flotante fija: Aportar | MAPA (botón central) | Perfil.
 // Vive fuera de las pantallas (TabSlot), así no se mueve al navegar; se esconde con el teclado abierto.
 export default function AppTabs() {
-  const insets = useSafeAreaInsets();
+  const barBottom = useTabBarBottom();
   const { isAdmin } = useAuth();
   const { data: pending } = usePendingRestaurants(isAdmin);
   const keyboard = useKeyboardVisible();
@@ -37,7 +37,7 @@ export default function AppTabs() {
           style={StyleSheet.flatten([
             styles.bar,
             {
-              bottom: Math.max(insets.bottom, space.lg),
+              bottom: barBottom,
               opacity: hide.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }),
               transform: [{ translateY: hide.interpolate({ inputRange: [0, 1], outputRange: [0, 140] }) }],
             },
@@ -118,7 +118,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     width: '92%',
     maxWidth: 420,
-    height: 68,
+    height: TAB_BAR_HEIGHT,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.surface,

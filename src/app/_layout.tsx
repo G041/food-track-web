@@ -1,11 +1,10 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Stack } from 'expo-router';
-import { View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
 
 import MenuModal from '@/components/menu-modal';
+import { SafeAreaDebug } from '@/components/safe-area-debug';
 import { AppText, Notice, Screen } from '@/components/ui';
 import { AuthProvider } from '@/features/auth/auth-provider';
 import { isMisconfigured } from '@/lib/api';
@@ -30,7 +29,6 @@ export default function RootLayout() {
   );
 
   const theme = useApplyTheme();
-  const insets = useSafeAreaInsets();
 
   if (isMisconfigured) return <MissingConfig />;
 
@@ -43,10 +41,7 @@ export default function RootLayout() {
           <Stack.Screen name="admin" options={{ title: 'Moderación' }} />
         </Stack>
         <MenuModal />
-        {/* App instalada en iOS: la barra de estado es translúcida (texto blanco) y va sobre el contenido */}
-        {insets.top > 0 && (
-          <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, height: insets.top, backgroundColor: colors.primary }} />
-        )}
+        <SafeAreaDebug />
       </AuthProvider>
     </QueryClientProvider>
   );

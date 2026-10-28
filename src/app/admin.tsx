@@ -11,7 +11,7 @@ import type { PendingRestaurant } from '@/lib/api';
 import { categoryMeta } from '@/lib/categories';
 import { useMenuViewer } from '@/features/menu/menu-store';
 import { useMenuPreview } from '@/features/menu/use-menu-preview';
-import { formatDate } from '@/lib/text';
+import { displayUsername, formatDate } from '@/lib/text';
 import { colors, radius, space } from '@/theme/tokens';
 
 export default function AdminScreen() {
@@ -69,7 +69,7 @@ function ReviewCard({ restaurant: r }: { restaurant: PendingRestaurant }) {
           <AppText style={styles.categoryText}>{meta.name}</AppText>
         </View>
         <AppText variant="small">
-          {r.submitter ? `@${r.submitter}` : 'anónimo'} · {formatDate(r.created_at)}
+          {displayUsername(r.submitter)} · {formatDate(r.created_at)}
         </AppText>
       </View>
 

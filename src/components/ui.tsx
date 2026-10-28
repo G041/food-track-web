@@ -16,9 +16,9 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ScreenTransition } from '@/components/motion';
-import { useHeaderOffset } from '@/hooks/use-header-offset';
+import { useHeaderOffset, useTabBarSpace } from '@/hooks/use-header-offset';
 import type { RestaurantStatus } from '@/lib/api';
-import { colors, font, MAX_CONTENT_WIDTH, radius, shadow, space, TAB_BAR_SPACE } from '@/theme/tokens';
+import { colors, font, MAX_CONTENT_WIDTH, radius, shadow, space } from '@/theme/tokens';
 
 type IconName = ComponentProps<typeof Ionicons>['name'];
 
@@ -34,13 +34,14 @@ export function AppText({
 export function Screen({ children, tabBar = true }: { children: ReactNode; tabBar?: boolean }) {
   const insets = useSafeAreaInsets();
   const top = useHeaderOffset();
+  const tabBarSpace = useTabBarSpace();
   return (
     <ScrollView
       style={styles.screen}
       keyboardShouldPersistTaps="handled"
       contentContainerStyle={[
         styles.screenContent,
-        { paddingTop: top, paddingBottom: (tabBar ? TAB_BAR_SPACE : space.xl) + insets.bottom },
+        { paddingTop: top, paddingBottom: tabBar ? tabBarSpace + space.xl : insets.bottom + space.xl },
       ]}>
       <ScreenTransition style={styles.screenInner}>{children}</ScreenTransition>
     </ScrollView>

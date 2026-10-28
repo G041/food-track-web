@@ -7,7 +7,7 @@ import { FadeIn } from '@/components/motion';
 import { AppText, Button, Card, Notice } from '@/components/ui';
 import { useAddNote, useAdminNotes, useDeleteNote, useSetNoteDone } from '@/features/restaurants/queries';
 import type { AdminNote } from '@/lib/api';
-import { formatDate } from '@/lib/text';
+import { displayUsername, formatDate } from '@/lib/text';
 import { colors, font, radius, space } from '@/theme/tokens';
 
 const MAX = 2000;
@@ -118,7 +118,7 @@ function NoteRow({ note, onDelete }: { note: AdminNote; onDelete: () => void }) 
       <View style={{ flex: 1, gap: 2 }}>
         <AppText style={[styles.noteBody, done && styles.noteBodyDone]}>{note.body}</AppText>
         <AppText variant="small" style={{ fontSize: font.size.xs }}>
-          {note.author ? `@${note.author}` : 'anónimo'} · {formatDate(note.created_at)}
+          {displayUsername(note.author)} · {formatDate(note.created_at)}
         </AppText>
       </View>
       <Pressable onPress={onDelete} hitSlop={8} accessibilityLabel="Borrar nota">

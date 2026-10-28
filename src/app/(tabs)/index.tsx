@@ -1,25 +1,24 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMemo, useState } from 'react';
 import { Animated, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { FadeIn, useMountTransition } from '@/components/motion';
 import RestaurantMap, { type MapMarker } from '@/components/restaurant-map';
 import { AppText, Button, Chip } from '@/components/ui';
 import { useMapFilters } from '@/features/map/filters-store';
 import { useApprovedRestaurants } from '@/features/restaurants/queries';
-import { useHeaderOffset } from '@/hooks/use-header-offset';
+import { useHeaderOffset, useTabBarSpace } from '@/hooks/use-header-offset';
 import { DEFAULT_CENTER, useUserLocation, type LatLng } from '@/hooks/use-user-location';
 import { isDemo, type Restaurant } from '@/lib/api';
 import { CATEGORIES, categoryMeta } from '@/lib/categories';
 import { useMenuViewer } from '@/features/menu/menu-store';
 import { openDirections } from '@/lib/links';
 import { normalize } from '@/lib/text';
-import { colors, font, MAX_CONTENT_WIDTH, radius, shadow, space, TAB_BAR_SPACE } from '@/theme/tokens';
+import { colors, font, MAX_CONTENT_WIDTH, radius, shadow, space } from '@/theme/tokens';
 
 export default function MapScreen() {
-  const insets = useSafeAreaInsets();
   const headerTop = useHeaderOffset();
+  const tabBarSpace = useTabBarSpace();
   const { data: restaurants = [], isLoading, isError, refetch } = useApprovedRestaurants();
   const { search, setSearch, category, setCategory, selectedId, select } = useMapFilters();
   const { location, denied, locate } = useUserLocation();
@@ -200,7 +199,7 @@ export default function MapScreen() {
       </View>
 
       {/* Controles inferiores */}
-      <View style={[styles.bottom, { paddingBottom: insets.bottom + TAB_BAR_SPACE - space.md }]} pointerEvents="box-none">
+      <View style={[styles.bottom, { paddingBottom: tabBarSpace + space.md }]} pointerEvents="box-none">
         <View style={styles.bottomInner} pointerEvents="box-none">
           <Pressable style={styles.locate} onPress={centerOnMe} accessibilityLabel="Centrar en mi ubicación">
             <Ionicons name={denied ? 'navigate-circle-outline' : 'navigate'} size={22} color={colors.ink} />

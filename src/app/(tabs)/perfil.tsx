@@ -11,7 +11,7 @@ import { useMySubmissions, usePendingRestaurants, useWithdrawRestaurant } from '
 import { api, isDemo } from '@/lib/api';
 import { DEMO_ADMIN } from '@/lib/api/demo-api';
 import { categoryMeta } from '@/lib/categories';
-import { formatDate } from '@/lib/text';
+import { displayUsername, formatDate } from '@/lib/text';
 import { useThemePreference, type ThemePreference } from '@/theme/theme-store';
 import { colors, radius, space } from '@/theme/tokens';
 
@@ -44,7 +44,7 @@ function ProfileView() {
         </View>
         <View style={{ flex: 1 }}>
           <AppText variant="title" numberOfLines={1}>
-            {profile?.username ?? '…'}
+            {profile ? displayUsername(profile.username) : '…'}
           </AppText>
           <AppText variant="small">{session?.email}</AppText>
         </View>

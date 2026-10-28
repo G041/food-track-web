@@ -17,7 +17,9 @@
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="FoodTrack" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <!-- "default": iOS reserva el espacio de la barra de estado (como Android). Con "black-translucent"
+         el contenido pasa por debajo y depende de env(safe-area-inset-top), que iOS reciente reporta en 0. -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
     <meta name="theme-color" content="#FFF7EE" />
     <meta name="format-detection" content="telephone=no" />

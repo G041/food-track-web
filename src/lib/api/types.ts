@@ -48,7 +48,8 @@ export interface Api {
   getSession(): Promise<Session | null>;
   onSessionChange(cb: (session: Session | null) => void): () => void;
   getProfile(userId: string): Promise<Profile | null>;
-  signIn(email: string, password: string): Promise<void>;
+  /** identifier: email o nombre de usuario. */
+  signIn(identifier: string, password: string): Promise<void>;
   /** Devuelve true si el usuario tiene que confirmar su email antes de entrar. */
   signUp(email: string, username: string, password: string): Promise<{ needsConfirmation: boolean }>;
   signOut(): Promise<void>;

@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { AppText, Button, Card, Notice, Screen, StatusBadge, TextField } from '@/components/ui';
 import { useAuth } from '@/features/auth/auth-provider';
 import { useMySubmissions, usePendingRestaurants, useWithdrawRestaurant } from '@/features/restaurants/queries';
@@ -10,6 +11,7 @@ import { api, isDemo } from '@/lib/api';
 import { DEMO_ADMIN } from '@/lib/api/demo-api';
 import { categoryMeta } from '@/lib/categories';
 import { formatDate } from '@/lib/text';
+import { useThemePreference, type ThemePreference } from '@/theme/theme-store';
 import { colors, radius, space } from '@/theme/tokens';
 
 export default function PerfilScreen() {
@@ -17,6 +19,7 @@ export default function PerfilScreen() {
   return (
     <Screen>
       {isLoading ? <ActivityIndicator color={colors.primary} /> : session ? <ProfileView /> : <AuthForm />}
+      <AppearanceCard />
     </Screen>
   );
 }
@@ -26,6 +29,9 @@ function ProfileView() {
   const { data: mine = [], isLoading } = useMySubmissions(session?.userId);
   const { data: pending = [] } = usePendingRestaurants(isAdmin);
   const withdraw = useWithdrawRestaurant();
+  const [confirmLogout, setConfirmLogout] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+  const [toWithdraw, setToWithdraw] = useState<{ id: number; name: string } | null>(null);
 
   const approved = mine.filter((r) => r.status === 'approved').length;
 
@@ -51,16 +57,16 @@ function ProfileView() {
 
       {isAdmin && (
         <Pressable onPress={() => router.push('/admin')} style={({ pressed }) => [styles.adminCard, pressed && { opacity: 0.85 }]}>
-          <Ionicons name="shield-checkmark" size={26} color="#fff" />
+          <Ionicons name="shield-checkmark" size={26} color={colors.inverseFg} />
           <View style={{ flex: 1 }}>
-            <AppText variant="heading" style={{ color: '#fff' }}>
+            <AppText variant="heading" style={{ color: colors.inverseFg }}>
               Panel de moderación
             </AppText>
-            <AppText variant="small" style={{ color: '#ffffffcc' }}>
+            <AppText variant="small" style={{ color: colors.inverseFg, opacity: 0.8 }}>
               {pending.length === 0 ? 'No hay aportes pendientes' : `${pending.length} aportes esperan revisión`}
             </AppText>
           </View>
-          <Ionicons name="chevron-forward" size={22} color="#fff" />
+          <Ionicons name="chevron-forward" size={22} color={colors.inverseFg} />
         </Pressable>
       )}
 
@@ -98,7 +104,7 @@ function ProfileView() {
                 variant="danger"
                 icon="trash-outline"
                 loading={withdraw.isPending && withdraw.variables === r.id}
-                onPress={() => withdraw.mutate(r.id)}
+                onPress={() => setToWithdraw({ id: r.id, name: r.name })}
                 style={{ alignSelf: 'flex-start', minHeight: 40 }}
               />
             )}
@@ -106,7 +112,38 @@ function ProfileView() {
         ))
       )}
 
-      <Button title="Cerrar sesión" variant="secondary" icon="log-out-outline" onPress={() => api.signOut()} />
+      <Button title="Cerrar sesión" variant="secondary" icon="log-out-outline" onPress={() => setConfirmLogout(true)} />
+
+      <ConfirmDialog
+        visible={confirmLogout}
+        icon="log-out-outline"
+        title="¿Seguro que querés cerrar la sesión?"
+        message="Vas a tener que volver a ingresar para aportar lugares."
+        confirmLabel="Cerrar sesión"
+        destructive
+        loading={signingOut}
+        onCancel={() => setConfirmLogout(false)}
+        onConfirm={async () => {
+          setSigningOut(true);
+          await api.signOut();
+          setSigningOut(false);
+          setConfirmLogout(false);
+        }}
+      />
+      <ConfirmDialog
+        visible={!!toWithdraw}
+        icon="trash-outline"
+        title="¿Retirar este aporte?"
+        message={toWithdraw ? `"${toWithdraw.name}" se va a quitar de la cola de revisión.` : undefined}
+        confirmLabel="Retirar"
+        destructive
+        loading={withdraw.isPending}
+        onCancel={() => setToWithdraw(null)}
+        onConfirm={() => {
+          // Sin "toWithdraw!": el React Compiler memoiza la expresión y la evaluaría con null.
+          if (toWithdraw) withdraw.mutate(toWithdraw.id, { onSettled: () => setToWithdraw(null) });
+        }}
+      />
     </>
   );
 }
@@ -121,9 +158,37 @@ function Stat({ value, label, icon }: { value: number; label: string; icon: 'tro
   );
 }
 
+const THEME_OPTIONS: { value: ThemePreference; label: string; icon: 'phone-portrait-outline' | 'sunny-outline' | 'moon-outline' }[] = [
+  { value: 'system', label: 'Sistema', icon: 'phone-portrait-outline' },
+  { value: 'light', label: 'Claro', icon: 'sunny-outline' },
+  { value: 'dark', label: 'Oscuro', icon: 'moon-outline' },
+];
+
+function AppearanceCard() {
+  const { preference, setPreference } = useThemePreference();
+  return (
+    <Card style={{ gap: space.sm }}>
+      <AppText variant="label">Apariencia</AppText>
+      <View style={styles.segment}>
+        {THEME_OPTIONS.map((o) => (
+          <Pressable
+            key={o.value}
+            onPress={() => setPreference(o.value)}
+            accessibilityRole="button"
+            accessibilityState={{ selected: preference === o.value }}
+            style={[styles.segmentItem, styles.segmentRow, preference === o.value && styles.segmentActive]}>
+            <Ionicons name={o.icon} size={16} color={preference === o.value ? colors.ink : colors.inkSoft} />
+            <AppText style={[styles.segmentText, preference === o.value && { color: colors.ink }]}>{o.label}</AppText>
+          </Pressable>
+        ))}
+      </View>
+    </Card>
+  );
+}
+
 function AuthForm() {
   const [mode, setMode] = useState<'login' | 'signup'>('login');
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(''); // en login: email o nombre de usuario
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -133,7 +198,12 @@ function AuthForm() {
   async function submit() {
     setError(null);
     setInfo(null);
-    if (!/^\S+@\S+\.\S+$/.test(email.trim())) return setError('Ingresá un email válido.');
+    const id = email.trim();
+    if (mode === 'signup' || id.includes('@')) {
+      if (!/^\S+@\S+\.\S+$/.test(id)) return setError('Ingresá un email válido.');
+    } else if (!/^[A-Za-z0-9_.]{4,15}$/.test(id)) {
+      return setError('Ingresá tu email o tu nombre de usuario.');
+    }
     if (mode === 'signup' && !/^[A-Za-z0-9_.]{4,15}$/.test(username)) {
       return setError('El usuario debe tener entre 4 y 15 caracteres (letras, números, punto o guion bajo).');
     }
@@ -182,14 +252,15 @@ function AuthForm() {
 
       <Card>
         <TextField
-          label="Email"
-          icon="mail-outline"
+          label={mode === 'login' ? 'Email o usuario' : 'Email'}
+          icon={mode === 'login' ? 'person-outline' : 'mail-outline'}
           value={email}
           onChangeText={setEmail}
           autoCapitalize="none"
-          autoComplete="email"
-          keyboardType="email-address"
-          placeholder="vos@email.com"
+          autoCorrect={false}
+          autoComplete={mode === 'login' ? 'username' : 'email'}
+          keyboardType={mode === 'login' ? 'default' : 'email-address'}
+          placeholder={mode === 'login' ? 'vos@email.com o tu usuario' : 'vos@email.com'}
         />
         {mode === 'signup' && (
           <TextField
@@ -219,8 +290,8 @@ function AuthForm() {
 
       {isDemo && (
         <Notice>
-          Modo demo (sin Supabase): los datos se guardan en este navegador. Para moderar, entrá con{' '}
-          {DEMO_ADMIN.email} / {DEMO_ADMIN.password}.
+          Modo demo (sin Supabase): los datos se guardan en este navegador. Para moderar, entrá con el usuario{' '}
+          admin (o {DEMO_ADMIN.email}) y la contraseña {DEMO_ADMIN.password}.
         </Notice>
       )}
     </>
@@ -255,7 +326,7 @@ const styles = StyleSheet.create({
     gap: space.md,
     padding: space.lg,
     borderRadius: radius.lg,
-    backgroundColor: colors.ink,
+    backgroundColor: colors.inverseBg,
   },
   rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   segment: {
@@ -266,5 +337,6 @@ const styles = StyleSheet.create({
   },
   segmentItem: { flex: 1, alignItems: 'center', paddingVertical: space.sm + 2, borderRadius: radius.pill },
   segmentActive: { backgroundColor: colors.surface },
+  segmentRow: { flexDirection: 'row', justifyContent: 'center', gap: 6 },
   segmentText: { fontWeight: '700', color: colors.inkSoft },
 });

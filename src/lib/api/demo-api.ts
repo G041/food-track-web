@@ -132,10 +132,11 @@ export function createDemoApi(): Api {
       return u ? { id: u.id, username: u.username, role: u.role, points: u.points } : null;
     },
 
-    async signIn(email, password) {
+    async signIn(identifier, password) {
       await delay();
-      const u = state.users.find((x) => x.email === email.trim().toLowerCase());
-      if (!u || u.password !== password) throw new ApiError('Email o contraseña incorrectos.');
+      const id = identifier.trim().toLowerCase();
+      const u = state.users.find((x) => x.email === id || x.username.toLowerCase() === id);
+      if (!u || u.password !== password) throw new ApiError('Usuario o contraseña incorrectos.');
       setSession({ userId: u.id, email: u.email });
     },
 

@@ -20,5 +20,8 @@ export type RestaurantMapProps = {
   onPick?: (coords: LatLng) => void;
 };
 
-export const MAP_STYLE_URL =
-  process.env.EXPO_PUBLIC_MAP_STYLE_URL ?? 'https://tiles.openfreemap.org/styles/positron';
+// Estilos de OpenFreeMap (gratis, sin API key), según el tema.
+export const MAP_STYLE_URLS = {
+  light: process.env.EXPO_PUBLIC_MAP_STYLE_URL ?? 'https://tiles.openfreemap.org/styles/positron',
+  dark: process.env.EXPO_PUBLIC_MAP_STYLE_URL_DARK ?? 'https://tiles.openfreemap.org/styles/dark',
+};

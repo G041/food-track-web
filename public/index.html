@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
+    <!-- Sin zoom de página (sensación de app). El modal de menú lo habilita mientras está abierto. -->
+    <meta
+      id="viewport"
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+    />
+    <title>%WEB_TITLE%</title>
+    <meta name="description" content="Mapa colaborativo de menús QR" />
+
+    <!-- App instalable (pantalla de inicio) -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="FoodTrack" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <meta name="theme-color" content="#FFF7EE" />
+    <meta name="format-detection" content="telephone=no" />
+
+    <!-- Aplica el tema guardado antes del primer render (evita el destello claro/oscuro). -->
+    <script>
+      (function () {
+        var pref = 'system';
+        try {
+          pref = localStorage.getItem('foodtrack-theme') || 'system';
+        } catch (e) {}
+        var dark = pref === 'dark' || (pref === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+        document.querySelector('meta[name="theme-color"]').setAttribute('content', dark ? '#14110F' : '#FFF7EE');
+      })();
+    </script>
+
+    <!-- The `react-native-web` recommended style reset: https://necolas.github.io/react-native-web/docs/setup/#root-element -->
+    <style id="expo-reset">
+      html,
+      body {
+        height: 100%;
+      }
+      body {
+        overflow: hidden;
+      }
+      #root {
+        display: flex;
+        height: 100%;
+        flex: 1;
+      }
+    </style>
+  </head>
+
+  <body>
+    <noscript> Necesitás JavaScript para usar FoodTrack. </noscript>
+    <div id="root"></div>
+  </body>
+</html>

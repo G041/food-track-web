@@ -4,6 +4,8 @@ import { Platform } from 'react-native';
 
 import { ApiError, type Api, type PendingRestaurant, type Restaurant } from './types';
 
+const API_URL = process.env.EXPO_PUBLIC_API_URL ?? '';
+
 export function createSupabaseApi(url: string, key: string): Api {
   const supabase = createClient(url, key, {
     auth: {
@@ -23,7 +25,7 @@ export function createSupabaseApi(url: string, key: string): Api {
   }
 
   function authFail(message: string): never {
-    if (/invalid login credentials/i.test(message)) throw new ApiError('Email o contraseña incorrectos.');
+    if (/invalid login credentials/i.test(message)) throw new ApiError('Usuario o contraseña incorrectos.');
     if (/email not confirmed/i.test(message)) throw new ApiError('Confirmá tu email antes de ingresar.');
     if (/already registered/i.test(message)) throw new ApiError('Ese email ya tiene una cuenta.');
     if (/password/i.test(message)) throw new ApiError('La contraseña debe tener al menos 6 caracteres.');
@@ -108,8 +110,32 @@ export function createSupabaseApi(url: string, key: string): Api {
       return data;
     },
 
-    async signIn(email, password) {
-      const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+    async signIn(identifier, password) {
+      const id = identifier.trim();
+      if (id.includes('@')) {
+        const { error } = await supabase.auth.signInWithPassword({ email: id, password });
+        if (error) authFail(error.message);
+        return;
+      }
+      // Con nombre de usuario: el servidor busca el email y hace el login, sin exponerlo al cliente.
+      let res: Response;
+      try {
+        res = await fetch(`${API_URL}/api/login`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ username: id, password }),
+        });
+      } catch {
+        throw new ApiError('No pudimos conectar. Probá de nuevo.');
+      }
+      const body = await res.json().catch(() => null);
+      if (!res.ok || !body?.access_token) {
+        throw new ApiError(body?.error ?? 'Por ahora ingresá con tu email.');
+      }
+      const { error } = await supabase.auth.setSession({
+        access_token: body.access_token,
+        refresh_token: body.refresh_token,
+      });
       if (error) authFail(error.message);
     },
 

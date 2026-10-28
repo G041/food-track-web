@@ -10,15 +10,32 @@ Lo que sigue está ordenado por prioridad. Cada ítem es una casilla para tachar
 
 - [x] **Base en Supabase** (proyecto `shqlyaqbymsngvakpwyw`, us-east-1): esquema y 28 restaurantes aplicados con `supabase db push --include-seed`. Verificado vía API: anónimo ve 28 aprobados, no puede insertar ni moderar, `restaurants_nearby` responde.
 - [x] **Reglas de moderación probadas** contra Postgres + PostGIS local (PGlite): 24 verificaciones en `supabase/tests/db.test.mjs` (`npm run test:db`, corre en la CI). Falta repetirlas una vez contra el proyecto Supabase real.
-- [ ] **Nombrar el primer admin:** registrarse en la web y correr `update public.profiles set role='admin' where username='…';` (SQL Editor de Supabase).
+- [x] **Primer admin:** la cuenta `gianni` es admin (28/10/2026). Para sumar otro: `npx supabase db query --linked "update public.profiles set role='admin' where username='…'"`.
+- [ ] **Activar el login con nombre de usuario en producción:** cargar en Vercel la variable `SUPABASE_SECRET_KEY` (clave *secret* de Supabase, tipo **Sensitive**, entornos Production y Preview) y volver a publicar. Sin ella, `api/login` responde "El login con usuario no está configurado" y solo funciona el login con email.
 - [x] **El modo demo ya no se activa solo en producción:** sin credenciales, la build publicada muestra "Falta configurar el backend". Para publicar una demo a propósito: `EXPO_PUBLIC_DEMO=true`.
 - [x] **Deploy en Vercel:** https://food-track-web.vercel.app (proyecto `food-track2/food-track-web`, deploy automático en cada push a `main`, variables `EXPO_PUBLIC_SUPABASE_URL`/`KEY` cargadas en Production y Preview).
 - [x] **Supabase Auth → URL Configuration:** Site URL = `https://food-track-web.vercel.app` y Redirect URL `https://food-track-web.vercel.app/**`.
 - [ ] **Probar el registro real de punta a punta:** crear la cuenta en la web, confirmar el email y verificar que el link lleve a la app.
 - [ ] **Escaneo de QR en celulares reales** (Chrome Android y Safari iOS) sobre HTTPS. Si `onBarcodeScanned` de `expo-camera` no detecta bien en web, hay que implementar un fallback con `@zxing/browser` en un `qr-scanner.web.tsx`.
 
+## 📱 Sensación de app nativa (hecho el 28/10/2026)
+
+- [x] Instalable desde la pantalla de inicio: `public/manifest.json`, `public/index.html` con meta tags de iOS y Android, ícono propio (`assets/branding/icon.svg` → PNG).
+- [x] Sin zoom de página, selección de texto, rebote ni "pull to refresh" fuera del modal de menú. Dentro del modal el zoom se habilita (`src/lib/page-zoom.web.ts`).
+- [x] Barra de tabs fija: el documento nunca se desplaza y la barra se oculta con el teclado abierto.
+- [x] La cámara se apaga al salir de la pestaña Aportar (`useIsFocused`).
+- [x] Login con email **o** nombre de usuario (`api/login.ts`; el email nunca llega al cliente).
+- [x] Categorías del mapa colapsables (botón junto al buscador).
+- [x] Confirmación al cerrar sesión y al retirar un aporte (`ConfirmDialog`).
+- [x] Animaciones de navegación: entrada de pantallas, pestañas, ficha del lugar, resultados y categorías (`src/components/motion.tsx`).
+- [x] Tema claro, oscuro o el del sistema (Perfil → Apariencia), incluido el mapa. En web usa variables CSS; en nativo, por ahora, solo el claro.
+- [ ] **Probar en iPhone y Android instalada** (Compartir → "Agregar a inicio" / menú → "Instalar app"): zoom, barra de estado, teclado y cámara.
+- [ ] **Rate limit del login con usuario:** las llamadas a Supabase salen desde las IPs de Vercel. Con mucho tráfico conviene limitar los intentos por usuario.
+
 ## 🟠 2. Funcionalidad que falta
 
+- [ ] **[A DEFINIR] Modo admin para editar la base desde la app:** que los admins puedan crear, editar, despublicar y borrar restaurantes, cambiar categorías, corregir links y ubicaciones, y gestionar usuarios (roles y puntos) sin pasar por el SQL Editor. Se apoya en el ítem "Admin: gestionar lo ya publicado".
+- [ ] **[A DEFINIR] Animación de bienvenida** al abrir la app: splash animado con el logo y/o una introducción de 2 o 3 pasos la primera vez.
 - [x] **Modal de menú dentro de la app** (`src/components/menu-modal/`): vista previa con estado (Verificando → Cargando → Menú cargado). `api/menu-preview.ts` (función de Vercel) verifica cada link: si se deja embeber, convierte Google Drive a `/preview` y detecta PDF. 17 de 28 menús de la v1 se ven dentro de la app.
 - [ ] **Corregir los menús rotos de la v1:** Blossom, El Querandí y Saint Elmo dan 404; Soffice es un Drive privado; Adelmo no resuelve DNS. Hay que pedir los links nuevos o despublicarlos desde el panel de admin.
 - [ ] **Menús que bloquean el iframe** (McDonald's, KFC, Starbucks, Garibaldi, Fabric Sushi, Vecino): en web solo se pueden abrir afuera. En la app nativa sí se van a ver dentro (WebView no tiene esa restricción). Opcional: mostrar una captura de la página con un servicio de screenshots.

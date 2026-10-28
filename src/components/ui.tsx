@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ScreenTransition } from '@/components/motion';
 import type { RestaurantStatus } from '@/lib/api';
 import { colors, font, MAX_CONTENT_WIDTH, radius, shadow, space, TAB_BAR_SPACE } from '@/theme/tokens';
 
@@ -39,7 +40,7 @@ export function Screen({ children, tabBar = true }: { children: ReactNode; tabBa
         styles.screenContent,
         { paddingTop: insets.top + space.xl, paddingBottom: (tabBar ? TAB_BAR_SPACE : space.xl) + insets.bottom },
       ]}>
-      <View style={styles.screenInner}>{children}</View>
+      <ScreenTransition style={styles.screenInner}>{children}</ScreenTransition>
     </ScrollView>
   );
 }
@@ -113,12 +114,14 @@ export function Chip({
   icon,
   active,
   color = colors.primary,
+  activeTextColor = '#fff',
   onPress,
 }: {
   label: string;
   icon?: IconName;
   active?: boolean;
   color?: string;
+  activeTextColor?: string;
   onPress?: () => void;
 }) {
   return (
@@ -131,8 +134,8 @@ export function Chip({
         active ? { backgroundColor: color, borderColor: color } : null,
         pressed && styles.pressed,
       ]}>
-      {icon && <Ionicons name={icon} size={15} color={active ? '#fff' : color} />}
-      <Text style={[styles.text, styles.chipText, active && { color: '#fff' }]}>{label}</Text>
+      {icon && <Ionicons name={icon} size={15} color={active ? activeTextColor : color} />}
+      <Text style={[styles.text, styles.chipText, active && { color: activeTextColor }]}>{label}</Text>
     </Pressable>
   );
 }

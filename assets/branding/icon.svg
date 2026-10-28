@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Fondo: cada plataforma lo recorta con su propia máscara redondeada -->
+  <rect width="512" height="512" fill="#E4572E"/>
+  <!-- Pin de mapa -->
+  <path d="M256 84c-78 0-141 62-141 139 0 99 118 206 130 217a16 16 0 0 0 22 0c12-11 130-118 130-217 0-77-63-139-141-139z" fill="#FFF7EE"/>
+  <!-- Plato -->
+  <circle cx="256" cy="222" r="58" fill="#E4572E"/>
+  <circle cx="256" cy="222" r="36" fill="none" stroke="#FFF7EE" stroke-width="8"/>
+  <!-- Tenedor (izq.) y cuchillo (der.) -->
+  <g fill="#E4572E">
+    <rect x="166" y="170" width="7" height="34" rx="3.5"/>
+    <rect x="178" y="170" width="7" height="34" rx="3.5"/>
+    <rect x="190" y="170" width="7" height="34" rx="3.5"/>
+    <path d="M166 198h31v8a15.5 15.5 0 0 1-31 0z"/>
+    <rect x="177" y="210" width="9" height="66" rx="4.5"/>
+    <path d="M327 170c14 6 20 24 20 48v12h-11v46a4.5 4.5 0 0 1-9 0z"/>
+  </g>
+</svg>

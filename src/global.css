@@ -4,16 +4,50 @@
   --font-display: 'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
 
+/* ── Sensación de app nativa ───────────────────────────────── */
+
+/* La página nunca se mueve: sin scroll del documento, rebote ni "pull to refresh".
+   El scroll vive dentro de cada pantalla, así la barra de tabs queda fija. */
 html,
 body {
-  background-color: #fff7ee;
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  overscroll-behavior: none;
+  background-color: var(--c-bg, #fff7ee);
   font-family: var(--font-display);
 }
 
+body {
+  /* Sin selección de texto, menú de "copiar/buscar" al mantener apretado ni resaltado al tocar */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  /* Sin zoom por doble toque (el pellizco se controla desde el viewport) */
+  touch-action: manipulation;
+}
+
+* {
+  overscroll-behavior: contain;
+}
+
+/* Los campos de texto sí se pueden seleccionar y editar */
 input,
-textarea {
+textarea,
+[contenteditable='true'] {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
   font-family: var(--font-display);
   outline: none;
+}
+
+/* El contenido del menú embebido se maneja solo */
+iframe {
+  -webkit-user-select: auto;
+  user-select: auto;
+  touch-action: auto;
 }
 
 .maplibregl-ctrl-attrib {

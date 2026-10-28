@@ -1,8 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Animated, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { FadeIn, useMountTransition } from '@/components/motion';
 import RestaurantMap, { type MapMarker } from '@/components/restaurant-map';
 import { AppText, Button, Chip } from '@/components/ui';
 import { useMapFilters } from '@/features/map/filters-store';
@@ -22,6 +23,9 @@ export default function MapScreen() {
   const { location, denied, locate } = useUserLocation();
   const [focus, setFocus] = useState<(LatLng & { zoom?: number }) | null>(null);
   const [searchFocused, setSearchFocused] = useState(false);
+  const [catsOpen, setCatsOpen] = useState(false);
+  const [catsMounted, catsAnim] = useMountTransition(catsOpen);
+  const activeCategory = category ? categoryMeta(category) : null;
 
   const visible = useMemo(() => {
     const q = normalize(search);
@@ -89,10 +93,18 @@ export default function MapScreen() {
                 <Ionicons name="close-circle" size={20} color={colors.inkMuted} />
               </Pressable>
             )}
+            <Pressable
+              onPress={() => setCatsOpen((o) => !o)}
+              style={[styles.filterButton, (catsOpen || !!category) && { backgroundColor: colors.primarySoft }]}
+              accessibilityLabel={catsOpen ? 'Ocultar categorías' : 'Mostrar categorías'}
+              accessibilityState={{ expanded: catsOpen }}>
+              <Ionicons name="options" size={20} color={catsOpen || category ? colors.primary : colors.inkSoft} />
+              {category && !catsOpen && <View style={styles.filterDot} />}
+            </Pressable>
           </View>
 
           {showResults && (
-            <View style={styles.results}>
+            <FadeIn from={-8} duration={180} style={styles.results}>
               {visible.length === 0 ? (
                 <AppText variant="small" style={{ padding: space.md }}>
                   No encontramos lugares con ese nombre.
@@ -118,15 +130,31 @@ export default function MapScreen() {
                   );
                 })
               )}
-            </View>
+            </FadeIn>
           )}
 
+          {catsMounted && (
+            <Animated.View
+              style={{
+                opacity: catsAnim,
+                transform: [{ translateY: catsAnim.interpolate({ inputRange: [0, 1], outputRange: [-10, 0] }) }],
+              }}>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.chips}
             style={styles.chipsScroll}>
-            <Chip label="Todos" icon="apps" active={!category} color={colors.ink} onPress={() => setCategory(null)} />
+            <Chip
+              label="Todos"
+              icon="apps"
+              active={!category}
+              color={colors.inverseBg}
+              activeTextColor={colors.inverseFg}
+              onPress={() => {
+                setCategory(null);
+                setCatsOpen(false);
+              }}
+            />
             {CATEGORIES.map((c) => (
               <Chip
                 key={c.slug}
@@ -134,20 +162,35 @@ export default function MapScreen() {
                 icon={c.icon}
                 color={c.color}
                 active={category === c.slug}
-                onPress={() => setCategory(category === c.slug ? null : c.slug)}
+                onPress={() => {
+                  setCategory(category === c.slug ? null : c.slug);
+                  setCatsOpen(false);
+                }}
               />
             ))}
           </ScrollView>
+            </Animated.View>
+          )}
 
-          <View style={styles.statusRow} pointerEvents="none">
+          <View style={styles.statusRow} pointerEvents="box-none">
             <View style={styles.pill}>
               <Text style={styles.pillText}>
                 {isLoading ? 'Cargando lugares…' : `${visible.length} ${visible.length === 1 ? 'lugar' : 'lugares'}`}
               </Text>
             </View>
+            {activeCategory && !catsOpen && (
+              <Pressable
+                onPress={() => setCategory(null)}
+                style={[styles.pill, styles.pillRow, { backgroundColor: activeCategory.color }]}
+                accessibilityLabel={`Quitar filtro ${activeCategory.name}`}>
+                <Ionicons name={activeCategory.icon} size={12} color="#fff" />
+                <Text style={[styles.pillText, { color: '#fff' }]}>{activeCategory.name}</Text>
+                <Ionicons name="close" size={12} color="#fff" />
+              </Pressable>
+            )}
             {isDemo && (
               <View style={[styles.pill, { backgroundColor: colors.accent }]}>
-                <Text style={styles.pillText}>Modo demo</Text>
+                <Text style={[styles.pillText, { color: '#1E1A16' }]}>Modo demo</Text>
               </View>
             )}
           </View>
@@ -168,7 +211,11 @@ export default function MapScreen() {
             </View>
           )}
 
-          {selected && <RestaurantSheet restaurant={selected} onClose={() => select(null)} />}
+          {selected && (
+            <FadeIn key={selected.id} from={40} duration={240}>
+              <RestaurantSheet restaurant={selected} onClose={() => select(null)} />
+            </FadeIn>
+          )}
         </View>
       </View>
     </View>
@@ -238,13 +285,31 @@ const styles = StyleSheet.create({
   chipsScroll: { marginHorizontal: -space.lg, flexGrow: 0 },
   chips: { gap: space.sm, paddingHorizontal: space.lg, paddingVertical: space.xs },
   statusRow: { flexDirection: 'row', gap: space.sm },
+  filterButton: {
+    width: 38,
+    height: 38,
+    marginRight: -space.sm,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  filterDot: {
+    position: 'absolute',
+    top: 7,
+    right: 7,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.primary,
+  },
+  pillRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   pill: {
-    backgroundColor: colors.ink,
+    backgroundColor: colors.inverseBg,
     paddingHorizontal: space.md,
     paddingVertical: 4,
     borderRadius: radius.pill,
   },
-  pillText: { color: '#fff', fontSize: font.size.xs, fontWeight: '700', fontFamily: font.family },
+  pillText: { color: colors.inverseFg, fontSize: font.size.xs, fontWeight: '700', fontFamily: font.family },
   bottom: { position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: space.lg, alignItems: 'center' },
   bottomInner: { width: '100%', maxWidth: MAX_CONTENT_WIDTH, gap: space.md },
   locate: {

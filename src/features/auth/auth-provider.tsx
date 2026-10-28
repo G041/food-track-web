@@ -37,7 +37,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const { data: profile = null } = useQuery({
     queryKey: ['profile', session?.userId],
-    queryFn: () => api.getProfile(session!.userId),
+    queryFn: () => (session ? api.getProfile(session.userId) : null),
     enabled: !!session,
   });
 

@@ -8,6 +8,7 @@ import { useMenuViewer, type MenuTarget } from '@/features/menu/menu-store';
 import { useMenuPreview, type MenuPreview } from '@/features/menu/use-menu-preview';
 import { categoryMeta } from '@/lib/categories';
 import { openMenu } from '@/lib/links';
+import { setPageZoomEnabled } from '@/lib/page-zoom';
 import { colors, font, radius, shadow, space } from '@/theme/tokens';
 
 import MenuFrame from './menu-frame';
@@ -20,6 +21,10 @@ const WIDE = 768;
 /** Modal global con la vista previa del menú. Se abre con useMenuViewer().open(...). */
 export default function MenuModal() {
   const { target, close } = useMenuViewer();
+  // El zoom de página solo se permite mientras se lee un menú.
+  useEffect(() => {
+    setPageZoomEnabled(!!target);
+  }, [target]);
   return (
     <Modal visible={!!target} transparent animationType="slide" onRequestClose={close}>
       {target && <MenuSheet key={target.url} target={target} onClose={close} />}
@@ -50,7 +55,7 @@ function MenuSheet({ target, onClose }: { target: MenuTarget; onClose: () => voi
   const phase: Phase = isLoading
     ? 'checking'
     : !showFrame
-      ? (preview!.status as Phase)
+      ? ((preview?.status ?? 'unreachable') as Phase)
       : loaded
         ? 'loaded'
         : slow
@@ -110,7 +115,7 @@ function MenuSheet({ target, onClose }: { target: MenuTarget; onClose: () => voi
           )}
 
           {!showFrame && phase !== 'checking' && (
-            <Fallback phase={phase} preview={preview!} onOpen={() => openMenu(target.url)} onClose={onClose} />
+            preview && <Fallback phase={phase} preview={preview} onOpen={() => openMenu(target.url)} onClose={onClose} />
           )}
         </View>
       </View>
@@ -219,7 +224,7 @@ function frameSrc(original: string, preview: MenuPreview | null | undefined, wid
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(30, 26, 22, 0.55)', justifyContent: 'flex-end' },
+  backdrop: { flex: 1, backgroundColor: colors.scrim, justifyContent: 'flex-end' },
   backdropWide: { justifyContent: 'center', alignItems: 'center', padding: space.xl },
   sheet: {
     flex: 1,

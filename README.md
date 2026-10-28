@@ -18,6 +18,7 @@ Es la v2 de [food-track](https://github.com/G041/food-track) + [food-track-backe
 ## Pantallas
 
 - **Mapa** (botón central, pantalla principal): pines por categoría, búsqueda sin acentos, filtro por categoría, ficha con "Ver menú" y "Cómo llegar".
+- **App instalable**: desde el navegador del celular, "Agregar a pantalla de inicio". Abre sin la interfaz del navegador, sin zoom ni selección de texto, con tema claro u oscuro.
 - **Modal de menú**: el menú se abre dentro de la app con un indicador de estado. `api/menu-preview.ts` (función de Vercel) verifica antes si el sitio permite mostrarse en un iframe, si el link está roto o si es PDF o Google Drive. Si el sitio lo prohíbe, el modal lo explica y ofrece abrirlo afuera.
 - **Aportar**: escanear el QR o pegar el link → nombre, categoría, dirección y ubicación en el mapa (por defecto, tu GPS) → *Enviar a revisión*.
 - **Perfil**: ingreso o registro, puntos, "Mis aportes" con su estado (En revisión / Publicado / Rechazado + motivo) y opción de retirar los pendientes.
@@ -53,7 +54,7 @@ Otros comandos: `npm run lint`, `npm run typecheck`, `npm run test:db` (prueba e
 | Web | https://food-track-web.vercel.app |
 | Hosting | Vercel, proyecto `food-track2/food-track-web` (plan Hobby). Publica solo en cada push a `main`; los PR generan previews |
 | Base de datos | Supabase, proyecto `shqlyaqbymsngvakpwyw` (us-east-1, plan Free) |
-| Variables en Vercel | `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_KEY` (Production y Preview) |
+| Variables en Vercel | `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_KEY` (públicas) y `SUPABASE_SECRET_KEY` (sensible, solo la usa `api/login`), en Production y Preview |
 | Auth | Site URL y Redirect URL apuntando a la web de Vercel |
 
 **Cambios en la base:** crear una migración nueva en `supabase/migrations/` (`npx supabase migration new <nombre>`), probarla con `npm run test:db` y aplicarla con:

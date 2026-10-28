@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { router } from 'expo-router';
+import { router, useIsFocused } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
@@ -29,6 +29,8 @@ export default function AportarScreen() {
   const { session, isAdmin } = useAuth();
   const [step, setStep] = useState<Step>('source');
   const [draft, setDraft] = useState<RestaurantDraft>(EMPTY);
+  // Las pestañas quedan montadas al navegar: sin esto la cámara seguiría encendida en otras pantallas.
+  const isFocused = useIsFocused();
 
   if (!session) {
     return (
@@ -73,7 +75,7 @@ export default function AportarScreen() {
         </>
       )}
 
-      {step === 'scan' && <ScanStep onUrl={startForm} onCancel={() => setStep('source')} />}
+      {step === 'scan' && isFocused && <ScanStep onUrl={startForm} onCancel={() => setStep('source')} />}
 
       {step === 'link' && <LinkStep onUrl={startForm} onCancel={() => setStep('source')} />}
 

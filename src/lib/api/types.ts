@@ -37,6 +37,8 @@ export type Session = { userId: string; email: string };
 
 export type ReviewDecision = 'approved' | 'rejected';
 
+export type RatingStats = { average: number; count: number };
+
 /** Nota interna del equipo (solo admins). */
 export type AdminNote = {
   id: number;
@@ -53,6 +55,15 @@ export interface Api {
   submit(input: NewRestaurant): Promise<Restaurant>;
   withdraw(id: number): Promise<void>;
   review(id: number, decision: ReviewDecision, note?: string): Promise<void>;
+
+  /** Promedio y cantidad de estrellas por restaurante (público). */
+  ratingStats(): Promise<Record<number, RatingStats>>;
+  /** Estrellas que puso el usuario logueado, por restaurante. */
+  myRatings(): Promise<Record<number, number>>;
+  /** stars null = quitar la calificación. */
+  rate(restaurantId: number, stars: number | null): Promise<void>;
+  myFavorites(): Promise<number[]>;
+  setFavorite(restaurantId: number, on: boolean): Promise<void>;
 
   listNotes(): Promise<AdminNote[]>;
   addNote(body: string): Promise<void>;

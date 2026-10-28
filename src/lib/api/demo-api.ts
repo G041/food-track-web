@@ -9,6 +9,9 @@ type DemoState = {
   session: Session | null;
   nextId: number;
   notes?: AdminNote[];
+  /** userId → restaurantId → estrellas */
+  ratings?: Record<string, Record<number, number>>;
+  favorites?: Record<string, number[]>;
 };
 
 const STORAGE_KEY = 'foodtrack-demo-v1';
@@ -121,6 +124,49 @@ export function createDemoApi(): Api {
       r.review_note = note?.trim() || null;
       const author = state.users.find((u) => u.id === r.submitted_by);
       if (decision === 'approved' && author) author.points += 10;
+      save();
+    },
+
+    async ratingStats() {
+      const acc: Record<number, { sum: number; count: number }> = {};
+      for (const byRestaurant of Object.values(state.ratings ?? {})) {
+        for (const [id, stars] of Object.entries(byRestaurant)) {
+          const a = (acc[Number(id)] ??= { sum: 0, count: 0 });
+          a.sum += stars;
+          a.count += 1;
+        }
+      }
+      return Object.fromEntries(
+        Object.entries(acc).map(([id, a]) => [id, { average: Math.round((a.sum / a.count) * 100) / 100, count: a.count }]),
+      );
+    },
+
+    async myRatings() {
+      return { ...(state.ratings?.[state.session?.userId ?? ''] ?? {}) };
+    },
+
+    async rate(restaurantId, stars) {
+      await delay();
+      const uid = state.session?.userId;
+      if (!uid) throw new ApiError('Ingresá para calificar.');
+      const mine = { ...(state.ratings?.[uid] ?? {}) };
+      if (stars === null) delete mine[restaurantId];
+      else mine[restaurantId] = stars;
+      state.ratings = { ...(state.ratings ?? {}), [uid]: mine };
+      save();
+    },
+
+    async myFavorites() {
+      return [...(state.favorites?.[state.session?.userId ?? ''] ?? [])];
+    },
+
+    async setFavorite(restaurantId, on) {
+      const uid = state.session?.userId;
+      if (!uid) throw new ApiError('Ingresá para guardar favoritos.');
+      const set = new Set(state.favorites?.[uid] ?? []);
+      if (on) set.add(restaurantId);
+      else set.delete(restaurantId);
+      state.favorites = { ...(state.favorites ?? {}), [uid]: [...set] };
       save();
     },
 

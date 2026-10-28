@@ -1,39 +1,78 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Animated, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { FadeIn, useMountTransition } from '@/components/motion';
+import { NearbySheet, type SheetSnap } from '@/components/nearby-sheet';
+import { RatingDialog } from '@/components/rating-dialog';
+import { RestaurantCard } from '@/components/restaurant-card';
 import RestaurantMap, { type MapMarker } from '@/components/restaurant-map';
 import { AppText, Button, Chip } from '@/components/ui';
+import { useAuth } from '@/features/auth/auth-provider';
 import { useMapFilters } from '@/features/map/filters-store';
-import { useApprovedRestaurants } from '@/features/restaurants/queries';
+import { useMenuViewer } from '@/features/menu/menu-store';
+import {
+  useApprovedRestaurants,
+  useFavorites,
+  useMyRatings,
+  useRatingStats,
+  useToggleFavorite,
+} from '@/features/restaurants/queries';
 import { useHeaderOffset, useTabBarSpace } from '@/hooks/use-header-offset';
 import { DEFAULT_CENTER, useUserLocation, type LatLng } from '@/hooks/use-user-location';
 import { isDemo, type Restaurant } from '@/lib/api';
 import { CATEGORIES, categoryMeta } from '@/lib/categories';
-import { useMenuViewer } from '@/features/menu/menu-store';
+import { distanceMeters } from '@/lib/geo';
 import { openDirections } from '@/lib/links';
 import { normalize } from '@/lib/text';
 import { colors, font, MAX_CONTENT_WIDTH, radius, shadow, space } from '@/theme/tokens';
 
+const SEARCH_HEIGHT = 54;
+
 export default function MapScreen() {
   const headerTop = useHeaderOffset();
   const tabBarSpace = useTabBarSpace();
+  const { session } = useAuth();
   const { data: restaurants = [], isLoading, isError, refetch } = useApprovedRestaurants();
+  const { data: stats = {} } = useRatingStats();
+  const { data: myRatings = {} } = useMyRatings(session?.userId);
+  const { data: favoriteIds = [] } = useFavorites(session?.userId);
+  const toggleFavorite = useToggleFavorite(session?.userId);
+  const openMenu = useMenuViewer((s) => s.open);
   const { search, setSearch, category, setCategory, selectedId, select } = useMapFilters();
   const { location, denied, locate } = useUserLocation();
+
   const [focus, setFocus] = useState<(LatLng & { zoom?: number }) | null>(null);
   const [searchFocused, setSearchFocused] = useState(false);
   const [catsOpen, setCatsOpen] = useState(false);
   const [catsMounted, catsAnim] = useMountTransition(catsOpen);
+  const [snap, setSnap] = useState<SheetSnap>('half');
+  const [onlyFavorites, setOnlyFavorites] = useState(false);
+  const [ratingFor, setRatingFor] = useState<Restaurant | null>(null);
+  const [askLogin, setAskLogin] = useState(false);
   const activeCategory = category ? categoryMeta(category) : null;
+  const favorites = useMemo(() => new Set(favoriteIds), [favoriteIds]);
 
   const visible = useMemo(() => {
     const q = normalize(search);
     return restaurants.filter(
-      (r) => (!category || r.category === category) && (!q || normalize(r.name).includes(q)),
+      (r) =>
+        (!category || r.category === category) &&
+        (!q || normalize(r.name).includes(q)) &&
+        (!onlyFavorites || favorites.has(r.id)),
     );
-  }, [restaurants, search, category]);
+  }, [restaurants, search, category, onlyFavorites, favorites]);
+
+  // Más cercanos primero; el lugar seleccionado en el mapa encabeza la lista.
+  const nearby = useMemo(() => {
+    const withDistance = visible.map((r) => ({ r, d: location ? distanceMeters(location, r) : null }));
+    withDistance.sort((a, b) =>
+      a.r.id === selectedId ? -1 : b.r.id === selectedId ? 1 : a.d != null && b.d != null ? a.d - b.d : a.r.name.localeCompare(b.r.name),
+    );
+    return withDistance;
+  }, [visible, location, selectedId]);
 
   const markers: MapMarker[] = visible.map((r) => ({
     id: r.id,
@@ -43,13 +82,23 @@ export default function MapScreen() {
     label: r.name,
   }));
 
-  const selected = restaurants.find((r) => r.id === selectedId) ?? null;
   const showResults = searchFocused && search.length > 0;
+  const count = visible.length;
+  const title = isLoading
+    ? 'Buscando lugares…'
+    : `${count} ${count === 1 ? 'lugar' : 'lugares'}${onlyFavorites ? ' favoritos' : location ? ' cerca tuyo' : ''}`;
 
   function choose(r: Restaurant) {
     select(r.id);
     setFocus({ latitude: r.latitude, longitude: r.longitude, zoom: 15 });
     setSearchFocused(false);
+    setSnap('half');
+  }
+
+  function locateOnMap(r: Restaurant) {
+    select(r.id);
+    setFocus({ latitude: r.latitude, longitude: r.longitude, zoom: 16 });
+    setSnap('collapsed');
   }
 
   async function centerOnMe() {
@@ -69,6 +118,7 @@ export default function MapScreen() {
         onMapPress={() => {
           select(null);
           setSearchFocused(false);
+          setSnap('collapsed');
         }}
         userLocation={location}
         focus={focus}
@@ -76,7 +126,67 @@ export default function MapScreen() {
         initialZoom={11.5}
       />
 
-      {/* Búsqueda + categorías */}
+      {/* Lugares cercanos (estilo Airbnb) */}
+      <NearbySheet
+        snap={snap}
+        onSnapChange={setSnap}
+        fullTop={headerTop + SEARCH_HEIGHT + space.lg + (isDemo || activeCategory ? 30 : 0)}
+        bottomInset={tabBarSpace}
+        title={title}
+        subtitle={location && !isLoading ? 'Ordenados por distancia' : undefined}
+        scrollKey={selectedId}
+        headerAccessory={
+          session ? (
+            <Pressable
+              onPress={() => setOnlyFavorites((v) => !v)}
+              style={[styles.favFilter, onlyFavorites && styles.favFilterOn]}
+              accessibilityRole="button"
+              accessibilityState={{ selected: onlyFavorites }}
+              accessibilityLabel="Mostrar solo favoritos">
+              <Ionicons name={onlyFavorites ? 'heart' : 'heart-outline'} size={18} color={onlyFavorites ? '#FF385C' : colors.inkSoft} />
+            </Pressable>
+          ) : undefined
+        }
+        floatingOverMap={
+          <Pressable style={styles.locate} onPress={centerOnMe} accessibilityLabel="Centrar en mi ubicación">
+            <Ionicons name={denied ? 'navigate-circle-outline' : 'navigate'} size={22} color={colors.ink} />
+          </Pressable>
+        }>
+        {isError ? (
+          <View style={styles.empty}>
+            <AppText variant="heading">No pudimos cargar los lugares</AppText>
+            <Button title="Reintentar" icon="refresh" onPress={() => refetch()} />
+          </View>
+        ) : !isLoading && nearby.length === 0 ? (
+          <View style={styles.empty}>
+            <Ionicons name={onlyFavorites ? 'heart-outline' : 'search'} size={32} color={colors.inkMuted} />
+            <AppText variant="small" style={{ textAlign: 'center' }}>
+              {onlyFavorites
+                ? 'Todavía no guardaste favoritos. Tocá el ♥ de una tarjeta para guardarla.'
+                : 'No hay lugares con estos filtros.'}
+            </AppText>
+          </View>
+        ) : (
+          nearby.map(({ r, d }) => (
+            <RestaurantCard
+              key={r.id}
+              restaurant={r}
+              distance={d}
+              stats={stats[r.id]}
+              myRating={myRatings[r.id]}
+              favorite={favorites.has(r.id)}
+              highlighted={r.id === selectedId}
+              onToggleFavorite={() => (session ? toggleFavorite.mutate({ id: r.id, on: !favorites.has(r.id) }) : setAskLogin(true))}
+              onLocate={() => locateOnMap(r)}
+              onOpenMenu={() => openMenu({ name: r.name, url: r.menu_url, category: r.category })}
+              onRate={() => setRatingFor(r)}
+              onDirections={() => openDirections(r.latitude, r.longitude)}
+            />
+          ))
+        )}
+      </NearbySheet>
+
+      {/* Búsqueda + categorías (por encima del panel) */}
       <View style={[styles.top, { paddingTop: headerTop }]} pointerEvents="box-none">
         <View style={styles.topInner} pointerEvents="box-none">
           <View style={styles.searchBox}>
@@ -140,127 +250,75 @@ export default function MapScreen() {
                 opacity: catsAnim,
                 transform: [{ translateY: catsAnim.interpolate({ inputRange: [0, 1], outputRange: [-10, 0] }) }],
               }}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.chips}
-            style={styles.chipsScroll}>
-            <Chip
-              label="Todos"
-              icon="apps"
-              active={!category}
-              color={colors.inverseBg}
-              activeTextColor={colors.inverseFg}
-              onPress={() => {
-                setCategory(null);
-                setCatsOpen(false);
-              }}
-            />
-            {CATEGORIES.map((c) => (
-              <Chip
-                key={c.slug}
-                label={c.name}
-                icon={c.icon}
-                color={c.color}
-                active={category === c.slug}
-                onPress={() => {
-                  setCategory(category === c.slug ? null : c.slug);
-                  setCatsOpen(false);
-                }}
-              />
-            ))}
-          </ScrollView>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips} style={styles.chipsScroll}>
+                <Chip
+                  label="Todos"
+                  icon="apps"
+                  active={!category}
+                  color={colors.inverseBg}
+                  activeTextColor={colors.inverseFg}
+                  onPress={() => {
+                    setCategory(null);
+                    setCatsOpen(false);
+                  }}
+                />
+                {CATEGORIES.map((c) => (
+                  <Chip
+                    key={c.slug}
+                    label={c.name}
+                    icon={c.icon}
+                    color={c.color}
+                    active={category === c.slug}
+                    onPress={() => {
+                      setCategory(category === c.slug ? null : c.slug);
+                      setCatsOpen(false);
+                    }}
+                  />
+                ))}
+              </ScrollView>
             </Animated.View>
           )}
 
-          <View style={styles.statusRow} pointerEvents="box-none">
-            <View style={styles.pill}>
-              <Text style={styles.pillText}>
-                {isLoading ? 'Cargando lugares…' : `${visible.length} ${visible.length === 1 ? 'lugar' : 'lugares'}`}
-              </Text>
-            </View>
-            {activeCategory && !catsOpen && (
-              <Pressable
-                onPress={() => setCategory(null)}
-                style={[styles.pill, styles.pillRow, { backgroundColor: activeCategory.color }]}
-                accessibilityLabel={`Quitar filtro ${activeCategory.name}`}>
-                <Ionicons name={activeCategory.icon} size={12} color="#fff" />
-                <Text style={[styles.pillText, { color: '#fff' }]}>{activeCategory.name}</Text>
-                <Ionicons name="close" size={12} color="#fff" />
-              </Pressable>
-            )}
-            {isDemo && (
-              <View style={[styles.pill, { backgroundColor: colors.accent }]}>
-                <Text style={[styles.pillText, { color: '#1E1A16' }]}>Modo demo</Text>
-              </View>
-            )}
-          </View>
-        </View>
-      </View>
-
-      {/* Controles inferiores */}
-      <View style={[styles.bottom, { paddingBottom: tabBarSpace + space.md }]} pointerEvents="box-none">
-        <View style={styles.bottomInner} pointerEvents="box-none">
-          <Pressable style={styles.locate} onPress={centerOnMe} accessibilityLabel="Centrar en mi ubicación">
-            <Ionicons name={denied ? 'navigate-circle-outline' : 'navigate'} size={22} color={colors.ink} />
-          </Pressable>
-
-          {isError && (
-            <View style={styles.sheet}>
-              <AppText variant="heading">No pudimos cargar el mapa</AppText>
-              <Button title="Reintentar" icon="refresh" onPress={() => refetch()} />
+          {(activeCategory || isDemo) && !catsOpen && (
+            <View style={styles.statusRow} pointerEvents="box-none">
+              {activeCategory && (
+                <Pressable
+                  onPress={() => setCategory(null)}
+                  style={[styles.pill, styles.pillRow, { backgroundColor: activeCategory.color }]}
+                  accessibilityLabel={`Quitar filtro ${activeCategory.name}`}>
+                  <Ionicons name={activeCategory.icon} size={12} color="#fff" />
+                  <Text style={[styles.pillText, { color: '#fff' }]}>{activeCategory.name}</Text>
+                  <Ionicons name="close" size={12} color="#fff" />
+                </Pressable>
+              )}
+              {isDemo && (
+                <View style={[styles.pill, { backgroundColor: colors.accent }]}>
+                  <Text style={[styles.pillText, { color: '#1E1A16' }]}>Modo demo</Text>
+                </View>
+              )}
             </View>
           )}
+        </View>
+      </View>
 
-          {selected && (
-            <FadeIn key={selected.id} from={40} duration={240}>
-              <RestaurantSheet restaurant={selected} onClose={() => select(null)} />
-            </FadeIn>
-          )}
-        </View>
-      </View>
-    </View>
-  );
-}
-
-function RestaurantSheet({ restaurant: r, onClose }: { restaurant: Restaurant; onClose: () => void }) {
-  const meta = categoryMeta(r.category);
-  const openMenu = useMenuViewer((s) => s.open);
-  return (
-    <View style={styles.sheet}>
-      <View style={styles.sheetHeader}>
-        <View style={[styles.sheetIcon, { backgroundColor: meta.color }]}>
-          <Ionicons name={meta.icon} size={22} color="#fff" />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={[styles.sheetCategory, { color: meta.color }]}>{meta.name.toUpperCase()}</Text>
-          <AppText variant="heading" numberOfLines={2}>
-            {r.name}
-          </AppText>
-        </View>
-        <Pressable onPress={onClose} hitSlop={10} accessibilityLabel="Cerrar">
-          <Ionicons name="close" size={24} color={colors.inkSoft} />
-        </Pressable>
-      </View>
-      {r.address && (
-        <View style={styles.sheetRow}>
-          <Ionicons name="location-outline" size={16} color={colors.inkSoft} />
-          <AppText variant="small" style={{ flex: 1 }}>
-            {r.address}
-          </AppText>
-        </View>
-      )}
-      <View style={styles.sheetActions}>
-        <Button title="Ver menú" icon="restaurant" onPress={() => openMenu({ name: r.name, url: r.menu_url, category: r.category })}
-          style={styles.sheetButton} />
-        <Button
-          title="Cómo llegar"
-          icon="navigate-outline"
-          variant="secondary"
-          onPress={() => openDirections(r.latitude, r.longitude)}
-          style={styles.sheetButton}
-        />
-      </View>
+      <RatingDialog
+        restaurant={ratingFor}
+        stats={ratingFor ? stats[ratingFor.id] : undefined}
+        current={ratingFor ? myRatings[ratingFor.id] : undefined}
+        onClose={() => setRatingFor(null)}
+      />
+      <ConfirmDialog
+        visible={askLogin}
+        icon="heart-outline"
+        title="Guardá tus lugares favoritos"
+        message="Ingresá con tu cuenta para guardar favoritos y encontrarlos rápido."
+        confirmLabel="Ingresar"
+        onCancel={() => setAskLogin(false)}
+        onConfirm={() => {
+          setAskLogin(false);
+          router.navigate('/perfil');
+        }}
+      />
     </View>
   );
 }
@@ -273,7 +331,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: space.sm,
-    height: 54,
+    height: SEARCH_HEIGHT,
     paddingHorizontal: space.lg,
     backgroundColor: colors.surface,
     borderRadius: radius.pill,
@@ -311,10 +369,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
   },
   pillText: { color: colors.inverseFg, fontSize: font.size.xs, fontWeight: '700', fontFamily: font.family },
-  bottom: { position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: space.lg, alignItems: 'center' },
-  bottomInner: { width: '100%', maxWidth: MAX_CONTENT_WIDTH, gap: space.md },
   locate: {
-    alignSelf: 'flex-end',
     width: 48,
     height: 48,
     borderRadius: 24,
@@ -323,11 +378,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     ...shadow,
   },
-  sheet: { backgroundColor: colors.surface, borderRadius: radius.lg, padding: space.lg, gap: space.md, ...shadow },
-  sheetHeader: { flexDirection: 'row', alignItems: 'center', gap: space.md },
-  sheetIcon: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
-  sheetCategory: { fontSize: font.size.xs, fontWeight: '800', letterSpacing: 0.8, fontFamily: font.family },
-  sheetRow: { flexDirection: 'row', gap: space.xs, alignItems: 'flex-start' },
-  sheetActions: { flexDirection: 'row', gap: space.sm },
-  sheetButton: { flex: 1, paddingHorizontal: space.md },
+  favFilter: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    borderWidth: 1,
+    borderColor: colors.line,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  favFilterOn: { backgroundColor: colors.primarySoft, borderColor: colors.primarySoft },
+  empty: { alignItems: 'center', gap: space.md, paddingVertical: space.xl },
 });

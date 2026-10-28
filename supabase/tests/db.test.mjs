@@ -108,5 +108,29 @@ ok(!!(await err(() => as(admin, () => q(`insert into admin_notes (body, created_
 ok(!!(await err(() => addNote(admin, '   '))), 'nota vacía se rechaza');
 ok((await as(admin, () => q(`delete from admin_notes where id = $1 returning id`, [note.id]))).length === 1, 'admin borra nota');
 
+// ── Calificaciones ──
+const rate = (uid, id, stars) =>
+  as(uid, () => q(`insert into ratings (restaurant_id, stars) values ($1, $2)
+                   on conflict (restaurant_id, user_id) do update set stars = excluded.stars returning *`, [id, stars]));
+ok(!!(await err(() => as(null, () => q(`insert into ratings (restaurant_id, stars) values (1, 5)`)))), 'anónimo no puede calificar');
+await rate(alice, 1, 5);
+await rate(bob, 1, 3);
+await rate(alice, 1, 4); // editar la propia
+const [stats] = await as(null, () => q(`select average, count from restaurant_rating_stats where restaurant_id = 1`));
+ok(stats.count === 2 && stats.average === 3.5, `promedio público por lugar (${stats.average}, ${stats.count})`);
+ok((await as(null, () => q(`select count(*)::int n from ratings`)))[0].n === 0, 'anónimo no ve calificaciones individuales');
+ok((await as(bob, () => q(`select count(*)::int n from ratings`)))[0].n === 1, 'cada usuario ve solo su calificación');
+ok(!!(await err(() => rate(alice, 1, 6))), 'estrellas fuera de 1..5 se rechazan');
+const [pendingR] = await ins(alice, 'https://pendiente.com/menu');
+ok(!!(await err(() => rate(bob, pendingR.id, 5))), 'no se califica un lugar sin aprobar');
+ok((await as(bob, () => q(`update ratings set stars = 1 where user_id = $1 returning *`, [alice]))).length === 0, 'no se edita la calificación de otro');
+
+// ── Favoritos ──
+await as(alice, () => q(`insert into favorites (restaurant_id) values (1), (2)`));
+ok((await as(alice, () => q(`select count(*)::int n from favorites`)))[0].n === 2, 'usuario guarda favoritos');
+ok((await as(bob, () => q(`select count(*)::int n from favorites`)))[0].n === 0, 'los favoritos son privados');
+ok(!!(await err(() => as(bob, () => q(`insert into favorites (user_id, restaurant_id) values ($1, 3)`, [alice])))), 'no se agregan favoritos a otro usuario');
+ok((await as(alice, () => q(`delete from favorites where restaurant_id = 1 returning *`))).length === 1, 'usuario quita un favorito');
+
 console.log(fails ? `\n${fails} FALLAS` : '\nTODO OK');
 process.exit(fails ? 1 : 0);

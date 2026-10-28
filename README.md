@@ -17,6 +17,7 @@ Es la v2 de [food-track](https://github.com/G041/food-track) + [food-track-backe
 
 ## Pantallas
 
+- **Cerca tuyo** (sobre el mapa): panel deslizable estilo Airbnb con tarjetas de los lugares más cercanos (fotos, ★ de la comunidad, distancia, favoritos, mini-mapa y menú).
 - **Mapa** (botón central, pantalla principal): pines por categoría, búsqueda sin acentos, filtro por categoría, ficha con "Ver menú" y "Cómo llegar".
 - **App instalable**: desde el navegador del celular, "Agregar a pantalla de inicio". Abre sin la interfaz del navegador, sin zoom ni selección de texto, con tema claro u oscuro.
 - **Modal de menú**: el menú se abre dentro de la app con un indicador de estado. `api/menu-preview.ts` (función de Vercel) verifica antes si el sitio permite mostrarse en un iframe, si el link está roto o si es PDF o Google Drive. Si el sitio lo prohíbe, el modal lo explica y ofrece abrirlo afuera.

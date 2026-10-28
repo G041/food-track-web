@@ -36,6 +36,43 @@ export function useWithdrawRestaurant() {
   return useMutation({ mutationFn: (id: number) => api.withdraw(id), onSuccess });
 }
 
+export function useRatingStats() {
+  return useQuery({ queryKey: ['ratings', 'stats'], queryFn: api.ratingStats });
+}
+
+export function useMyRatings(userId: string | undefined) {
+  return useQuery({ queryKey: ['ratings', 'mine', userId], queryFn: api.myRatings, enabled: !!userId });
+}
+
+export function useRate() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number; stars: number | null }) => api.rate(v.id, v.stars),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['ratings'] }),
+  });
+}
+
+export function useFavorites(userId: string | undefined) {
+  return useQuery({ queryKey: ['favorites', userId], queryFn: api.myFavorites, enabled: !!userId });
+}
+
+/** Alterna un favorito con respuesta inmediata (actualización optimista). */
+export function useToggleFavorite(userId: string | undefined) {
+  const queryClient = useQueryClient();
+  const key = ['favorites', userId];
+  return useMutation({
+    mutationFn: (v: { id: number; on: boolean }) => api.setFavorite(v.id, v.on),
+    onMutate: async ({ id, on }) => {
+      await queryClient.cancelQueries({ queryKey: key });
+      const prev = queryClient.getQueryData<number[]>(key);
+      queryClient.setQueryData<number[]>(key, (ids = []) => (on ? [...new Set([...ids, id])] : ids.filter((x) => x !== id)));
+      return { prev };
+    },
+    onError: (_e, _v, ctx) => queryClient.setQueryData(key, ctx?.prev),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: key }),
+  });
+}
+
 export function useAdminNotes(enabled: boolean) {
   return useQuery({ queryKey: ['admin-notes'], queryFn: api.listNotes, enabled });
 }

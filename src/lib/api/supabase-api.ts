@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient, type PostgrestError } from '@supabase/supabase-js';
 import { Platform } from 'react-native';
 
-import { ApiError, type AdminNote, type Api, type PendingRestaurant, type Restaurant } from './types';
+import { ApiError, type AdminNote, type Api, type PendingRestaurant, type RatingStats, type Restaurant } from './types';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? '';
 
@@ -83,6 +83,43 @@ export function createSupabaseApi(url: string, key: string): Api {
         p_decision: decision,
         p_note: note ?? null,
       });
+      if (error) fail(error);
+    },
+
+    async ratingStats() {
+      const { data, error } = await supabase.from('restaurant_rating_stats').select('restaurant_id, average, count');
+      if (error) fail(error);
+      const out: Record<number, RatingStats> = {};
+      for (const r of data ?? []) out[r.restaurant_id] = { average: r.average, count: r.count };
+      return out;
+    },
+
+    async myRatings() {
+      const { data, error } = await supabase.from('ratings').select('restaurant_id, stars');
+      if (error) fail(error);
+      return Object.fromEntries((data ?? []).map((r) => [r.restaurant_id, r.stars]));
+    },
+
+    async rate(restaurantId, stars) {
+      const { error } =
+        stars === null
+          ? await supabase.from('ratings').delete().eq('restaurant_id', restaurantId)
+          : await supabase.from('ratings').upsert({ restaurant_id: restaurantId, stars }, { onConflict: 'restaurant_id,user_id' });
+      if (error) fail(error);
+    },
+
+    async myFavorites() {
+      const { data, error } = await supabase.from('favorites').select('restaurant_id');
+      if (error) fail(error);
+      return (data ?? []).map((r) => r.restaurant_id as number);
+    },
+
+    async setFavorite(restaurantId, on) {
+      const { error } = on
+        ? await supabase
+            .from('favorites')
+            .upsert({ restaurant_id: restaurantId }, { onConflict: 'user_id,restaurant_id', ignoreDuplicates: true })
+        : await supabase.from('favorites').delete().eq('restaurant_id', restaurantId);
       if (error) fail(error);
     },
 

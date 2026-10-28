@@ -38,6 +38,10 @@ Lo que sigue está ordenado por prioridad. Cada ítem es una casilla para tachar
 
 ## 🟠 2. Funcionalidad que falta
 
+- [x] **Modo "cerca tuyo" estilo Airbnb** (28/10/2026): panel deslizable sobre el mapa con 3 posiciones (escondido / media altura / completo con botón "Mapa"), tarjetas con fotos deslizables, ★ promedio (calificaciones de usuarios, tabla `ratings` + vista `restaurant_rating_stats`), distancia y orden por cercanía, ♥ favoritos (tabla `favorites`, filtro en el panel), mini-mapa, "Ver menú", "Calificar" y "Cómo llegar". Componentes: `nearby-sheet.tsx`, `restaurant-card.tsx`, `photo-carousel.tsx`, `rating-dialog.tsx`.
+- [ ] **Fotos reales de los lugares:** hoy las tarjetas muestran ilustraciones por categoría (`category-art.tsx`). Pendiente decidir quién las sube (usuarios con moderación o solo admins), guardarlas en Supabase Storage y pasarlas a `PhotoCarousel` (ya acepta cualquier contenido por slide).
+- [ ] **Badge destacado en las tarjetas** ("Mejor valorado", "Nuevo"…): ver la nota "[FUTURO] Badge destacado" en *Notas del equipo* (Perfil, admins), con el contexto completo.
+- [ ] **Idea de la nota del equipo "Carrousel entre los menu modal"** (estilo Instagram: scroll vertical cambia de lugar, lateral cambia de foto, y desde la preview se llega al menú). El panel de tarjetas cubre la base; falta la versión a pantalla completa navegable desde el modal de menú.
 - [ ] **[A DEFINIR] Modo admin para editar la base desde la app:** que los admins puedan crear, editar, despublicar y borrar restaurantes, cambiar categorías, corregir links y ubicaciones, y gestionar usuarios (roles y puntos) sin pasar por el SQL Editor. Se apoya en el ítem "Admin: gestionar lo ya publicado".
 - [ ] **[A DEFINIR] Animación de bienvenida** al abrir la app: splash animado con el logo y/o una introducción de 2 o 3 pasos la primera vez.
 - [x] **Modal de menú dentro de la app** (`src/components/menu-modal/`): vista previa con estado (Verificando → Cargando → Menú cargado). `api/menu-preview.ts` (función de Vercel) verifica cada link: si se deja embeber, convierte Google Drive a `/preview` y detecta PDF. 17 de 28 menús de la v1 se ven dentro de la app.

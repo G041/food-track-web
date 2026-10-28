@@ -8,11 +8,12 @@ Lo que sigue está ordenado por prioridad. Cada ítem es una casilla para tachar
 
 ## 🔴 1. Bloqueantes para usar la app de verdad
 
-- [ ] **Crear el proyecto Supabase y ejecutar el SQL** (`supabase/migrations/20261027000000_init.sql` y después `supabase/seed.sql`). Ya se validó en un Postgres local con PostGIS; falta aplicarlo en el proyecto real.
+- [x] **Base en Supabase** (proyecto `shqlyaqbymsngvakpwyw`, us-east-1): esquema y 28 restaurantes aplicados con `supabase db push --include-seed`. Verificado vía API: anónimo ve 28 aprobados, no puede insertar ni moderar, `restaurants_nearby` responde.
 - [x] **Reglas de moderación probadas** contra Postgres + PostGIS local (PGlite): 24 verificaciones en `supabase/tests/db.test.mjs` (`npm run test:db`, corre en la CI). Falta repetirlas una vez contra el proyecto Supabase real.
-- [ ] **Configurar `.env`** (`EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_KEY`) y nombrar el primer admin con `update public.profiles set role='admin' where username='…';`.
+- [ ] **Nombrar el primer admin:** registrarse en la web y correr `update public.profiles set role='admin' where username='…';` (SQL Editor de Supabase).
 - [x] **El modo demo ya no se activa solo en producción:** sin credenciales, la build publicada muestra "Falta configurar el backend". Para publicar una demo a propósito: `EXPO_PUBLIC_DEMO=true`.
-- [ ] **Deploy en Vercel.** Importar el repo y cargar las variables de entorno. En Supabase, configurar *Authentication → URL Configuration* (Site URL y Redirect URLs con el dominio de Vercel) para que los emails de confirmación lleven a la app.
+- [x] **Deploy en Vercel:** https://food-track-web.vercel.app (proyecto `food-track2/food-track-web`, deploy automático en cada push a `main`, variables `EXPO_PUBLIC_SUPABASE_URL`/`KEY` cargadas en Production y Preview).
+- [ ] **Supabase Auth → URL Configuration:** Site URL = `https://food-track-web.vercel.app` y agregarla en Redirect URLs, para que el email de confirmación lleve a la web.
 - [ ] **Escaneo de QR en celulares reales** (Chrome Android y Safari iOS) sobre HTTPS. Si `onBarcodeScanned` de `expo-camera` no detecta bien en web, hay que implementar un fallback con `@zxing/browser` en un `qr-scanner.web.tsx`.
 
 ## 🟠 2. Funcionalidad que falta

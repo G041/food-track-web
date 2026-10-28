@@ -47,3 +47,9 @@ public/maplibre-gl-worker.mjs
 
 # env
 .env
+
+# vercel / supabase CLI
+.vercel
+.env*
+!.env.example
+supabase/.temp/

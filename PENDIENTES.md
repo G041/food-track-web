@@ -1,6 +1,6 @@
 # Pendientes de FoodTrack web
 
-Estado al 27/10/2026. Lo que **ya funciona**: la app web en modo demo, con mapa, búsqueda, filtros, aportes con moderación, perfil y panel de admin. El flujo completo se probó en Chrome simulando un celular.
+Estado al 28/10/2026. **La app está en producción:** https://food-track-web.vercel.app (Vercel), conectada a la base real en Supabase. Funcionan el mapa, la búsqueda, los filtros, el modal de menú, los aportes con moderación, el perfil y el panel de admin.
 
 Lo que sigue está ordenado por prioridad. Cada ítem es una casilla para tachar cuando se resuelve.
 
@@ -13,7 +13,8 @@ Lo que sigue está ordenado por prioridad. Cada ítem es una casilla para tachar
 - [ ] **Nombrar el primer admin:** registrarse en la web y correr `update public.profiles set role='admin' where username='…';` (SQL Editor de Supabase).
 - [x] **El modo demo ya no se activa solo en producción:** sin credenciales, la build publicada muestra "Falta configurar el backend". Para publicar una demo a propósito: `EXPO_PUBLIC_DEMO=true`.
 - [x] **Deploy en Vercel:** https://food-track-web.vercel.app (proyecto `food-track2/food-track-web`, deploy automático en cada push a `main`, variables `EXPO_PUBLIC_SUPABASE_URL`/`KEY` cargadas en Production y Preview).
-- [ ] **Supabase Auth → URL Configuration:** Site URL = `https://food-track-web.vercel.app` y agregarla en Redirect URLs, para que el email de confirmación lleve a la web.
+- [x] **Supabase Auth → URL Configuration:** Site URL = `https://food-track-web.vercel.app` y Redirect URL `https://food-track-web.vercel.app/**`.
+- [ ] **Probar el registro real de punta a punta:** crear la cuenta en la web, confirmar el email y verificar que el link lleve a la app.
 - [ ] **Escaneo de QR en celulares reales** (Chrome Android y Safari iOS) sobre HTTPS. Si `onBarcodeScanned` de `expo-camera` no detecta bien en web, hay que implementar un fallback con `@zxing/browser` en un `qr-scanner.web.tsx`.
 
 ## 🟠 2. Funcionalidad que falta
@@ -42,6 +43,14 @@ Lo que sigue está ordenado por prioridad. Cada ítem es una casilla para tachar
 - [ ] **Revisión de accesibilidad:** etiquetas en todos los botones con ícono, contraste y navegación con teclado.
 - [ ] La fuente se carga desde Google Fonts con un `@import` en CSS. Evaluar `expo-font` o alojarla en el propio sitio.
 - [ ] **Modo oscuro** (opcional; hoy `userInterfaceStyle` está fijo en `light`).
+
+## 👥 Colaboración en equipo
+
+- [ ] **Vercel Hobby no permite invitar miembros** (Pro cuesta USD 20 por usuario por mes; la prueba de 14 días quita a los miembros al terminar). Plan gratuito propuesto:
+  - Sumar a los compañeros como colaboradores del repo en GitHub. Con el repo **público**, sus pushes a `main` se publican igual. Si el repo pasa a privado, Vercel Hobby bloquea los deploys de commits de otras personas.
+  - Trabajar con pull requests: cada PR genera una URL de preview. Para que se vean sin cuenta de Vercel, desactivar *Settings → Deployment Protection → Vercel Authentication*.
+  - Invitar a los compañeros a la organización de Supabase (*Organization → Team*), si el plan Free lo permite.
+- [ ] Decidir si el repo queda público (recomendado: no tiene secretos) o pasa a privado.
 
 ## 🔵 4. Calidad y mantenimiento
 

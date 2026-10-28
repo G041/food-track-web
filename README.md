@@ -46,7 +46,27 @@ Otros comandos: `npm run lint`, `npm run typecheck`, `npm run test:db` (prueba e
 
 > **Al agregar dependencias desde Windows:** npm a veces saca del `package-lock.json` dependencias opcionales que Linux necesita (`@emnapi/*`), y la CI falla en `npm ci`. Verificalo antes de subir con `npm run check:lock`. Si falla, regenerá el lockfile completo: `rm -rf node_modules package-lock.json && npm install`.
 
-## Conectar Supabase (backend real)
+## Producción
+
+| | |
+|---|---|
+| Web | https://food-track-web.vercel.app |
+| Hosting | Vercel, proyecto `food-track2/food-track-web` (plan Hobby). Publica solo en cada push a `main`; los PR generan previews |
+| Base de datos | Supabase, proyecto `shqlyaqbymsngvakpwyw` (us-east-1, plan Free) |
+| Variables en Vercel | `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_KEY` (Production y Preview) |
+| Auth | Site URL y Redirect URL apuntando a la web de Vercel |
+
+**Cambios en la base:** crear una migración nueva en `supabase/migrations/` (`npx supabase migration new <nombre>`), probarla con `npm run test:db` y aplicarla con:
+
+```bash
+npx supabase login                                   # una vez, en una terminal propia
+npx supabase link --project-ref shqlyaqbymsngvakpwyw
+npx supabase db push --linked
+```
+
+**Deploy manual** (si hiciera falta): `vercel deploy --prod`, con la CLI de Vercel logueada en la cuenta dueña del proyecto.
+
+## Conectar Supabase en otro proyecto (desde cero)
 
 1. Creá un proyecto en [supabase.com](https://supabase.com) (plan Free, región São Paulo).
 2. En **SQL Editor**, ejecutá en orden:

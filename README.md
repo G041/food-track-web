@@ -18,6 +18,7 @@ Es la v2 de [food-track](https://github.com/G041/food-track) + [food-track-backe
 ## Pantallas
 
 - **Mapa** (botón central, pantalla principal): pines por categoría, búsqueda sin acentos, filtro por categoría, ficha con "Ver menú" y "Cómo llegar".
+- **Modal de menú**: el menú se abre dentro de la app con un indicador de estado. `api/menu-preview.ts` (función de Vercel) verifica antes si el sitio permite mostrarse en un iframe, si el link está roto o si es PDF o Google Drive. Si el sitio lo prohíbe, el modal lo explica y ofrece abrirlo afuera.
 - **Aportar**: escanear el QR o pegar el link → nombre, categoría, dirección y ubicación en el mapa (por defecto, tu GPS) → *Enviar a revisión*.
 - **Perfil**: ingreso o registro, puntos, "Mis aportes" con su estado (En revisión / Publicado / Rechazado + motivo) y opción de retirar los pendientes.
 - **Moderación** (`/admin`, solo admins): cola de aportes pendientes con el link y un mapa de control, para aprobar o rechazar con motivo.

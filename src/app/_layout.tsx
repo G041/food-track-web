@@ -3,6 +3,7 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
 
+import MenuModal from '@/components/menu-modal';
 import { AppText, Notice, Screen } from '@/components/ui';
 import { AuthProvider } from '@/features/auth/auth-provider';
 import { isMisconfigured } from '@/lib/api';
@@ -35,6 +36,7 @@ export default function RootLayout() {
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="admin" options={{ title: 'Moderación' }} />
         </Stack>
+        <MenuModal />
       </AuthProvider>
     </QueryClientProvider>
   );

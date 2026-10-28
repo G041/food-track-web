@@ -9,7 +9,8 @@ import { useAuth } from '@/features/auth/auth-provider';
 import { usePendingRestaurants, useReviewRestaurant } from '@/features/restaurants/queries';
 import type { PendingRestaurant } from '@/lib/api';
 import { categoryMeta } from '@/lib/categories';
-import { openMenu } from '@/lib/links';
+import { useMenuViewer } from '@/features/menu/menu-store';
+import { useMenuPreview } from '@/features/menu/use-menu-preview';
 import { formatDate } from '@/lib/text';
 import { colors, radius, space } from '@/theme/tokens';
 
@@ -57,6 +58,8 @@ function ReviewCard({ restaurant: r }: { restaurant: PendingRestaurant }) {
   const [rejecting, setRejecting] = useState(false);
   const meta = categoryMeta(r.category);
   const busy = review.isPending;
+  const openMenu = useMenuViewer((s) => s.open);
+  const { data: preview, isLoading: checking } = useMenuPreview(r.menu_url);
 
   return (
     <Card>
@@ -73,7 +76,8 @@ function ReviewCard({ restaurant: r }: { restaurant: PendingRestaurant }) {
       <AppText variant="heading">{r.name}</AppText>
       {r.address && <AppText variant="small">{r.address}</AppText>}
 
-      <Pressable onPress={() => openMenu(r.menu_url)} style={styles.link}>
+      <LinkCheck checking={checking} status={preview === null ? 'unknown' : preview?.status} httpStatus={preview?.httpStatus} />
+      <Pressable onPress={() => openMenu({ name: r.name, url: r.menu_url, category: r.category })} style={styles.link}>
         <Ionicons name="open-outline" size={16} color={colors.primaryDark} />
         <AppText variant="small" style={{ color: colors.primaryDark, flex: 1 }} numberOfLines={1}>
           {r.menu_url}
@@ -128,7 +132,39 @@ function ReviewCard({ restaurant: r }: { restaurant: PendingRestaurant }) {
   );
 }
 
+const LINK_STATUS = {
+  embeddable: { icon: 'checkmark-circle', color: colors.success, text: 'El menú carga y se puede ver dentro de la app' },
+  unverified: { icon: 'help-circle', color: colors.warning, text: 'El sitio no deja verificarlo; abrilo para revisar' },
+  blocked: { icon: 'eye-off', color: colors.warning, text: 'El link funciona, pero el sitio no se deja mostrar dentro de la app' },
+  broken: { icon: 'close-circle', color: colors.danger, text: 'El link está roto' },
+  unreachable: { icon: 'cloud-offline', color: colors.danger, text: 'El sitio no responde' },
+  invalid: { icon: 'alert-circle', color: colors.danger, text: 'El link no es válido' },
+  unknown: { icon: 'help-circle', color: colors.inkMuted, text: 'No se pudo verificar el link' },
+} as const;
+
+function LinkCheck({ checking, status, httpStatus }: { checking: boolean; status?: keyof typeof LINK_STATUS; httpStatus?: number | null }) {
+  if (checking) {
+    return (
+      <View style={styles.check}>
+        <ActivityIndicator size="small" color={colors.inkMuted} />
+        <AppText variant="small">Verificando el link del menú…</AppText>
+      </View>
+    );
+  }
+  const s = LINK_STATUS[status ?? 'unknown'];
+  return (
+    <View style={styles.check}>
+      <Ionicons name={s.icon} size={16} color={s.color} />
+      <AppText variant="small" style={{ color: s.color, flex: 1, fontWeight: '600' }}>
+        {s.text}
+        {status === 'broken' && httpStatus ? ` (error ${httpStatus})` : ''}
+      </AppText>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  check: { flexDirection: 'row', alignItems: 'center', gap: space.xs },
   header: { flexDirection: 'row', alignItems: 'center', gap: space.md },
   back: {
     width: 44,

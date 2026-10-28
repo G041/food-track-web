@@ -18,6 +18,9 @@ Lo que sigue está ordenado por prioridad. Cada ítem es una casilla para tachar
 
 ## 🟠 2. Funcionalidad que falta
 
+- [x] **Modal de menú dentro de la app** (`src/components/menu-modal/`): vista previa con estado (Verificando → Cargando → Menú cargado). `api/menu-preview.ts` (función de Vercel) verifica cada link: si se deja embeber, convierte Google Drive a `/preview` y detecta PDF. 17 de 28 menús de la v1 se ven dentro de la app.
+- [ ] **Corregir los menús rotos de la v1:** Blossom, El Querandí y Saint Elmo dan 404; Soffice es un Drive privado; Adelmo no resuelve DNS. Hay que pedir los links nuevos o despublicarlos desde el panel de admin.
+- [ ] **Menús que bloquean el iframe** (McDonald's, KFC, Starbucks, Garibaldi, Fabric Sushi, Vecino): en web solo se pueden abrir afuera. En la app nativa sí se van a ver dentro (WebView no tiene esa restricción). Opcional: mostrar una captura de la página con un servicio de screenshots.
 - [ ] **Recuperar contraseña** (`supabase.auth.resetPasswordForEmail`) y una pantalla para fijar la nueva.
 - [ ] **Login con nombre de usuario.** Hoy solo funciona con email, porque Supabase Auth lo requiere. Haría falta una RPC que resuelva username → email sin exponer los emails.
 - [ ] **Editar un aporte pendiente.** La base ya lo permite (vuelve a quedar pendiente), pero no hay UI.

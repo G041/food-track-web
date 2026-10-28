@@ -10,7 +10,8 @@ import { useApprovedRestaurants } from '@/features/restaurants/queries';
 import { DEFAULT_CENTER, useUserLocation, type LatLng } from '@/hooks/use-user-location';
 import { isDemo, type Restaurant } from '@/lib/api';
 import { CATEGORIES, categoryMeta } from '@/lib/categories';
-import { openDirections, openMenu } from '@/lib/links';
+import { useMenuViewer } from '@/features/menu/menu-store';
+import { openDirections } from '@/lib/links';
 import { normalize } from '@/lib/text';
 import { colors, font, MAX_CONTENT_WIDTH, radius, shadow, space, TAB_BAR_SPACE } from '@/theme/tokens';
 
@@ -176,6 +177,7 @@ export default function MapScreen() {
 
 function RestaurantSheet({ restaurant: r, onClose }: { restaurant: Restaurant; onClose: () => void }) {
   const meta = categoryMeta(r.category);
+  const openMenu = useMenuViewer((s) => s.open);
   return (
     <View style={styles.sheet}>
       <View style={styles.sheetHeader}>
@@ -201,7 +203,8 @@ function RestaurantSheet({ restaurant: r, onClose }: { restaurant: Restaurant; o
         </View>
       )}
       <View style={styles.sheetActions}>
-        <Button title="Ver menú" icon="restaurant" onPress={() => openMenu(r.menu_url)} style={styles.sheetButton} />
+        <Button title="Ver menú" icon="restaurant" onPress={() => openMenu({ name: r.name, url: r.menu_url, category: r.category })}
+          style={styles.sheetButton} />
         <Button
           title="Cómo llegar"
           icon="navigate-outline"

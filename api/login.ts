@@ -14,6 +14,9 @@ const json = (body: unknown, status = 200) =>
 // Mismo mensaje si el usuario no existe o la contraseña es incorrecta (no revelar qué usuarios existen).
 const WRONG = { error: 'Usuario o contraseña incorrectos.' };
 
+// Log interno (Vercel → Logs) para diagnosticar en qué paso falla, sin datos sensibles.
+const log = (step: string, detail?: string) => console.log(`[api/login] ${step}${detail ? `: ${detail}` : ''}`);
+
 export async function POST(request: Request) {
   const url = process.env.EXPO_PUBLIC_SUPABASE_URL;
   const publicKey = process.env.EXPO_PUBLIC_SUPABASE_KEY;
@@ -29,19 +32,27 @@ export async function POST(request: Request) {
   const admin = createClient(url, secretKey, options);
 
   // ilike para ignorar mayúsculas; se escapan "_" y "%" porque son comodines de LIKE.
-  const { data: profile } = await admin
+  const { data: profile, error: profileError } = await admin
     .from('profiles')
     .select('id')
     .ilike('username', username.replace(/[_%\\]/g, '\\$&'))
     .maybeSingle();
-  if (!profile) return json(WRONG, 401);
+  if (profileError) log('profile_lookup_error', profileError.message);
+  if (!profile) {
+    log('profile_not_found');
+    return json(WRONG, 401);
+  }
 
-  const { data: user } = await admin.auth.admin.getUserById(profile.id);
+  const { data: user, error: userError } = await admin.auth.admin.getUserById(profile.id);
   const email = user?.user?.email;
-  if (!email) return json(WRONG, 401);
+  if (!email) {
+    log('get_user_failed', userError?.message);
+    return json(WRONG, 401);
+  }
 
   const { data, error } = await createClient(url, publicKey, options).auth.signInWithPassword({ email, password });
   if (error || !data.session) {
+    log('sign_in_failed', error?.message);
     if (error && /email not confirmed/i.test(error.message)) {
       return json({ error: 'Confirmá tu email antes de ingresar.' }, 401);
     }
@@ -51,5 +62,6 @@ export async function POST(request: Request) {
     return json(WRONG, 401);
   }
 
+  log('ok');
   return json({ access_token: data.session.access_token, refresh_token: data.session.refresh_token });
 }

@@ -17,10 +17,9 @@ import { colors, font, MAX_CONTENT_WIDTH, radius, shadow, space } from '@/theme/
 
 export type SheetSnap = 'collapsed' | 'half' | 'full';
 
-// Lo que asoma con el panel escondido: manija + título + subtítulo, más lo que sobresale
-// el botón central del mapa por encima de la barra de tabs.
+// Cabecera visible al plegar el panel, con una separación compacta sobre las tabs.
 const HANDLE_AREA = 72;
-const MAP_BUTTON_OVERHANG = 34;
+const COLLAPSED_NAV_GAP = 12;
 const ORDER: SheetSnap[] = ['collapsed', 'half', 'full'];
 const native = Platform.OS !== 'web';
 
@@ -63,7 +62,7 @@ export function NearbySheet({
   const sheetHeight = measuredHeight ?? Math.max(0, windowHeight - fullTop);
 
   const positions = useMemo(() => {
-    const collapsed = Math.max(0, sheetHeight - (bottomInset + MAP_BUTTON_OVERHANG + HANDLE_AREA));
+    const collapsed = Math.max(0, sheetHeight - (bottomInset + COLLAPSED_NAV_GAP + HANDLE_AREA));
     const half = Math.min(collapsed, Math.max(0, sheetHeight - Math.round((sheetHeight + fullTop) * 0.5)));
     return { full: 0, half, collapsed } as Record<SheetSnap, number>;
   }, [sheetHeight, bottomInset, fullTop]);

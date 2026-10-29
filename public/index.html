@@ -25,6 +25,30 @@
     <meta name="theme-color" content="#FFF7EE" />
     <meta name="format-detection" content="telephone=no" />
 
+    <!-- Identidad de la app local al agregarla al inicio desde localhost o la red privada. -->
+    <script id="local-app-branding">
+      (function () {
+        var host = window.location.hostname.toLowerCase();
+        var parts = host.split('.').map(Number);
+        var ipv4 = parts.length === 4 && parts.every(function (part) {
+          return Number.isInteger(part) && part >= 0 && part <= 255;
+        });
+        var privateNetwork = ipv4 && (
+          parts[0] === 10 || parts[0] === 127 ||
+          (parts[0] === 192 && parts[1] === 168) ||
+          (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31)
+        );
+        var local = privateNetwork || host === 'localhost' || host === '[::1]' ||
+          host.endsWith('.localhost') || host.endsWith('.local');
+        if (!local) return;
+
+        document.title = 'FoodTrack Local';
+        document.querySelector('link[rel="manifest"]').setAttribute('href', '/manifest-local.json');
+        document.querySelector('link[rel="apple-touch-icon"]').setAttribute('href', '/icons/local/apple-touch-icon.png');
+        document.querySelector('meta[name="apple-mobile-web-app-title"]').setAttribute('content', 'FoodTrack Local');
+      })();
+    </script>
+
     <!-- Aplica el tema guardado antes del primer render (evita el destello claro/oscuro). -->
     <script>
       (function () {

@@ -1,0 +1,18 @@
+{
+  "id": "/foodtrack-local",
+  "name": "FoodTrack Local",
+  "short_name": "FoodTrack Local",
+  "description": "Versión local de FoodTrack para pruebas",
+  "lang": "es-AR",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FFF7EE",
+  "theme_color": "#2563EB",
+  "icons": [
+    { "src": "/icons/local/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/local/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/local/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

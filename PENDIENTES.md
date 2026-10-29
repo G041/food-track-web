@@ -4,7 +4,7 @@ Estado al 28/10/2026. **La app está en producción:** https://food-track-web.ve
 
 Lo que sigue está ordenado por prioridad. Cada ítem es una casilla para tachar cuando se resuelve.
 
-Revisión del backlog: las aclaraciones de implementación se contrastaron con el código local. Esta revisión no verifica nuevamente producción ni reemplaza las pruebas de registro, instalación y cámara en dispositivos reales que siguen pendientes.
+Última revisión: 29/10/2026. Las aclaraciones de implementación se contrastaron con el código local. Esta revisión no reemplaza las pruebas de registro, instalación y cámara en dispositivos reales que siguen pendientes.
 
 ---
 
@@ -32,17 +32,20 @@ Revisión del backlog: las aclaraciones de implementación se contrastaron con e
 - [x] Confirmación al cerrar sesión y al retirar un aporte (`ConfirmDialog`).
 - [x] Animaciones de navegación: entrada de pantallas, pestañas, ficha del lugar, resultados y categorías (`src/components/motion.tsx`).
 - [x] Tema claro, oscuro o el del sistema (Perfil → Apariencia), incluido el mapa. En web usa variables CSS; en nativo, por ahora, solo el claro.
-- [x] **Posición de los HUD por zonas seguras** (`src/hooks/use-header-offset.ts`): encabezado = alto de la barra de estado + 12px; barra de tabs = 12px + (inset inferior − 20px). En iOS instalada, la barra de estado es `black-translucent` (la app pinta esa franja: fondo en oscuro, naranja en claro, `status-bar-scrim.tsx`); como iOS reciente informa `safe-area-inset-top` = 0, el alto se estima por tamaño de pantalla (59/48/20px). iOS toma el estilo al **agregar** la app al inicio: si cambia, hay que borrarla y volver a agregarla. Diagnóstico: `?debug=1`.
+- [x] **Posición de los HUD por zonas seguras** (`src/hooks/use-header-offset.ts`): encabezado = alto de la barra de estado + 12px, con 16px adicionales en iOS instalada para alejarlo del difuminado del sistema; barra de tabs = 12px + max(0, inset inferior − 20px). En iOS instalada, la barra de estado es `black-translucent` (la app pinta esa franja: fondo en oscuro, naranja en claro, `status-bar-scrim.tsx`); como Expo Router 58 devuelve insets en cero en web, se estima el alto de la barra de estado por tamaño de pantalla (59/48/20px). Diagnóstico: `?debug=1`.
 - [x] Usuarios mostrados como `@Usuario` (primera letra en mayúscula) en todos lados (`displayUsername`).
 - [x] Contraseña: botón para verla u ocultarla; tras un login fallido, la primera tecla de borrar la vacía entera; al crear cuenta se pide repetirla.
 - [x] **Notas del equipo** (solo admins) en Perfil: tabla `admin_notes` con RLS (migración `20261028000000`), crear, marcar como hecha y borrar.
 - [ ] **Probar en iPhone y Android instalada** (Compartir → "Agregar a inicio" / menú → "Instalar app"): zoom, barra de estado, teclado y cámara.
-- [ ] **Verificar la franja vacía debajo de la navegación en iOS instalada:** corrección local en `src/global.css` para usar `100vh` sin fijar `html/body` en modo standalone. Falta confirmar en iPhone después de publicar: abrir en frío, rotar, abrir/cerrar el teclado y volver desde segundo plano. El diagnóstico ahora muestra también el tamaño del documento y de `#root`.
+- [ ] **Completar la verificación de la franja inferior en iOS instalada:** corrección desplegada en `90a3fe1`, usando `100vh` sin fijar `html/body` en modo standalone. El usuario probó la versión local en iPhone; faltan las comprobaciones sistemáticas de apertura en frío, rotación, teclado y vuelta desde segundo plano. El diagnóstico muestra el tamaño del documento y de `#root`.
+- [x] **Identidad de la versión local:** ícono azul y nombre "FoodTrack Local" para localhost y redes privadas (`public/manifest-local.json`, `public/icons/local/`). La web pública conserva su identidad habitual.
+- [x] **Claridad de las tarjetas y panel de cercanos:** botón "Ir" para ubicar el lugar en el mapa, fondo y borde en las tarjetas de la lista, flecha de indicaciones con ajuste óptico y panel plegado 22px más abajo.
 - [ ] **Rate limit del login con usuario:** las llamadas a Supabase salen desde las IPs de Vercel. Con mucho tráfico conviene limitar los intentos por usuario.
 
 ## 🟠 2. Funcionalidad que falta
 
 - [x] **Modo "cerca tuyo" estilo Airbnb** (28/10/2026): panel deslizable sobre el mapa con 3 posiciones (escondido / media altura / completo con botón "Mapa"), tarjetas con fotos deslizables, ★ promedio (calificaciones de usuarios, tabla `ratings` + vista `restaurant_rating_stats`), distancia y orden por cercanía, ♥ favoritos (tabla `favorites`, filtro en el panel), mini-mapa, "Ver menú", "Calificar" y "Cómo llegar". Componentes: `nearby-sheet.tsx`, `restaurant-card.tsx`, `photo-carousel.tsx`, `rating-dialog.tsx`.
+- [x] **Ficha independiente al tocar un pin:** `restaurant-details-modal.tsx` abre una tarjeta sobre el mapa y la navegación, con cierre y acciones del restaurante. Seleccionar un pin no cambia la altura, el orden ni el scroll de la lista de cercanos.
 - [ ] **Fotos reales de los lugares:** hoy las tarjetas muestran ilustraciones por categoría (`category-art.tsx`). Pendiente decidir quién las sube (usuarios con moderación o solo admins), guardarlas en Supabase Storage y pasarlas a `PhotoCarousel` (ya acepta cualquier contenido por slide).
 - [ ] **Badge destacado en las tarjetas** ("Mejor valorado", "Nuevo"…): ver la nota "[FUTURO] Badge destacado" en *Notas del equipo* (Perfil, admins), con el contexto completo.
 - [ ] **Idea de la nota del equipo "Carrousel entre los menu modal"** (estilo Instagram: scroll vertical cambia de lugar, lateral cambia de foto, y desde la preview se llega al menú). El panel de tarjetas cubre la base; falta la versión a pantalla completa navegable desde el modal de menú.
@@ -54,7 +57,7 @@ Revisión del backlog: las aclaraciones de implementación se contrastaron con e
 - [ ] **Recuperar contraseña** (`supabase.auth.resetPasswordForEmail`) y una pantalla para fijar la nueva.
 - [ ] **Editar un aporte pendiente.** La base ya lo permite (vuelve a quedar pendiente), pero no hay UI.
 - [ ] **Admin: gestionar lo ya publicado.** Falta poder despublicar o borrar restaurantes aprobados, ver el historial de rechazados y editar datos. Hoy el panel solo muestra la cola de pendientes.
-- [ ] **Ficha compartible `/restaurant/[id]`** con URL propia (estaba en el plan; hoy la ficha es solo un panel sobre el mapa).
+- [ ] **Ficha compartible `/restaurant/[id]`** con URL propia (la ficha modal independiente ya existe, pero no tiene URL propia).
 - [ ] **Encuadre inicial del mapa.** Arranca en el Obelisco con zoom 11.5 y los locales de zona norte (San Isidro, Olivos) quedan fuera de la vista. Convendría ajustar a los marcadores (`fitBounds`) o a la ubicación del usuario.
 - [ ] **Escalar la consulta de restaurantes.** `listApproved` trae todos los aprobados y el panel "cerca tuyo" calcula y ordena distancias en el cliente (`src/app/(tabs)/index.tsx`, `src/lib/geo.ts`). La RPC `restaurants_nearby` existe y tiene una prueba local, pero la app no la llama. Evaluar usarla para consultas por cercanía, filtrar por área visible y agrupar pines cercanos (clustering) cuando crezca el volumen de datos.
 - [ ] **Geocodificación:** autocompletar la dirección a partir del pin, o el pin a partir de la dirección.
@@ -80,6 +83,7 @@ Revisión del backlog: las aclaraciones de implementación se contrastaron con e
 
 ## 🔵 4. Calidad y mantenimiento
 
+- [ ] **Fluidez del panel y los carruseles (pospuesto por el usuario):** comparar una build optimizada y perfilar en iPhone antes de atribuir causas. Candidatos detectados en el código: gestos y springs ejecutados en JavaScript en web, y todas las tarjetas y sus slides montadas en un ScrollView. Considerar renderizado por ventana y animaciones adecuadas para web tras medir.
 - [ ] **Tests unitarios de la app:** agregar cobertura de `validation.ts` y del filtro del mapa. Los tests de base y RLS ya existen (ver sección 1).
 - [ ] **Test e2e con Playwright** en `e2e/`: registro → aporte → aprobación → aparece en el mapa.
 - [x] **CI en GitHub Actions configurada** con lint, typecheck, tests de base y build (`.github/workflows/ci.yml`). La primera ejecución fallaba en `npm ci` por el lockfile desincronizado y la carpeta `public/` faltante; se corrigió en `858bf1f`. El estado de la última ejecución debe consultarse en GitHub.

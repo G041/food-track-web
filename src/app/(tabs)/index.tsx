@@ -1,13 +1,14 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Animated, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Animated, Keyboard, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { FadeIn, useMountTransition } from '@/components/motion';
 import { NearbySheet, type SheetSnap } from '@/components/nearby-sheet';
 import { RatingDialog } from '@/components/rating-dialog';
 import { RestaurantCard } from '@/components/restaurant-card';
+import { RestaurantDetailsModal } from '@/components/restaurant-details-modal';
 import RestaurantMap, { type MapMarker } from '@/components/restaurant-map';
 import { AppText, Button, Chip } from '@/components/ui';
 import { useAuth } from '@/features/auth/auth-provider';
@@ -50,10 +51,12 @@ export default function MapScreen() {
   const [catsMounted, catsAnim] = useMountTransition(catsOpen);
   const [snap, setSnap] = useState<SheetSnap>('half');
   const [onlyFavorites, setOnlyFavorites] = useState(false);
+  const [detailsId, setDetailsId] = useState<number | null>(null);
   const [ratingFor, setRatingFor] = useState<Restaurant | null>(null);
   const [askLogin, setAskLogin] = useState(false);
   const activeCategory = category ? categoryMeta(category) : null;
   const favorites = useMemo(() => new Set(favoriteIds), [favoriteIds]);
+  const detailsRestaurant = restaurants.find((r) => r.id === detailsId);
 
   const visible = useMemo(() => {
     const q = normalize(search);
@@ -65,14 +68,14 @@ export default function MapScreen() {
     );
   }, [restaurants, search, category, onlyFavorites, favorites]);
 
-  // Más cercanos primero; el lugar seleccionado en el mapa encabeza la lista.
+  // La lista mantiene su orden aunque se abra la ficha de un pin del mapa.
   const nearby = useMemo(() => {
     const withDistance = visible.map((r) => ({ r, d: location ? distanceMeters(location, r) : null }));
     withDistance.sort((a, b) =>
-      a.r.id === selectedId ? -1 : b.r.id === selectedId ? 1 : a.d != null && b.d != null ? a.d - b.d : a.r.name.localeCompare(b.r.name),
+      a.d != null && b.d != null ? a.d - b.d : a.r.name.localeCompare(b.r.name),
     );
     return withDistance;
-  }, [visible, location, selectedId]);
+  }, [visible, location]);
 
   const markers: MapMarker[] = visible.map((r) => ({
     id: r.id,
@@ -89,10 +92,11 @@ export default function MapScreen() {
     : `${count} ${count === 1 ? 'lugar' : 'lugares'}${onlyFavorites ? ' favoritos' : location ? ' cerca tuyo' : ''}`;
 
   function choose(r: Restaurant) {
+    Keyboard.dismiss();
     select(r.id);
+    setDetailsId(r.id);
     setFocus({ latitude: r.latitude, longitude: r.longitude, zoom: 15 });
     setSearchFocused(false);
-    setSnap('half');
   }
 
   function locateOnMap(r: Restaurant) {
@@ -134,7 +138,6 @@ export default function MapScreen() {
         bottomInset={tabBarSpace}
         title={title}
         subtitle={location && !isLoading ? 'Ordenados por distancia' : undefined}
-        scrollKey={selectedId}
         headerAccessory={
           session ? (
             <Pressable
@@ -170,6 +173,7 @@ export default function MapScreen() {
           nearby.map(({ r, d }) => (
             <RestaurantCard
               key={r.id}
+              framed
               restaurant={r}
               distance={d}
               stats={stats[r.id]}
@@ -300,6 +304,35 @@ export default function MapScreen() {
           )}
         </View>
       </View>
+
+      {detailsRestaurant && (
+        <RestaurantDetailsModal
+          key={detailsRestaurant.id}
+          restaurant={detailsRestaurant}
+          distance={location ? distanceMeters(location, detailsRestaurant) : null}
+          stats={stats[detailsRestaurant.id]}
+          myRating={myRatings[detailsRestaurant.id]}
+          favorite={favorites.has(detailsRestaurant.id)}
+          onClose={() => setDetailsId(null)}
+          onToggleFavorite={() => {
+            if (session) {
+              toggleFavorite.mutate({ id: detailsRestaurant.id, on: !favorites.has(detailsRestaurant.id) });
+            } else {
+              setDetailsId(null);
+              setAskLogin(true);
+            }
+          }}
+          onOpenMenu={() => {
+            setDetailsId(null);
+            openMenu({ name: detailsRestaurant.name, url: detailsRestaurant.menu_url, category: detailsRestaurant.category });
+          }}
+          onRate={() => {
+            setDetailsId(null);
+            setRatingFor(detailsRestaurant);
+          }}
+          onDirections={() => openDirections(detailsRestaurant.latitude, detailsRestaurant.longitude)}
+        />
+      )}
 
       <RatingDialog
         restaurant={ratingFor}

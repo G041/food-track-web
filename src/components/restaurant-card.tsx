@@ -24,6 +24,7 @@ export function RestaurantCard({
   stats,
   myRating,
   favorite,
+  framed = false,
   highlighted,
   onToggleFavorite,
   onLocate,
@@ -36,9 +37,10 @@ export function RestaurantCard({
   stats?: RatingStats;
   myRating?: number;
   favorite: boolean;
+  framed?: boolean;
   highlighted?: boolean;
   onToggleFavorite: () => void;
-  onLocate: () => void;
+  onLocate?: () => void;
   onOpenMenu: () => void;
   onRate: () => void;
   onDirections: () => void;
@@ -47,7 +49,7 @@ export function RestaurantCard({
   const rating = formatRating(stats);
 
   return (
-    <View style={[styles.card, highlighted && styles.highlighted]}>
+    <View style={[styles.card, framed && styles.framed, highlighted && styles.highlighted]}>
       <View style={styles.photo}>
         <PhotoCarousel
           height={PHOTO_HEIGHT}
@@ -64,12 +66,14 @@ export function RestaurantCard({
           accessibilityLabel={favorite ? `Quitar ${r.name} de favoritos` : `Guardar ${r.name} en favoritos`}>
           <Ionicons name={favorite ? 'heart' : 'heart-outline'} size={24} color={favorite ? '#FF385C' : '#fff'} />
         </Pressable>
-        <Pressable onPress={onLocate} style={styles.miniMap} accessibilityRole="button" accessibilityLabel={`Ver ${r.name} en el mapa`}>
-          <Ionicons name="map" size={20} color="#1E1A16" />
-        </Pressable>
+        {onLocate && (
+          <Pressable onPress={onLocate} style={styles.miniMap} accessibilityRole="button" accessibilityLabel={`Ir a ${r.name} en el mapa`}>
+            <AppText style={styles.miniMapLabel}>Ir</AppText>
+          </Pressable>
+        )}
       </View>
 
-      <View style={styles.body}>
+      <View style={[styles.body, framed && styles.framedBody]}>
         <View style={styles.titleRow}>
           <AppText style={styles.name} numberOfLines={1}>
             {r.name}
@@ -100,7 +104,7 @@ export function RestaurantCard({
             style={styles.rateButton}
           />
           <Pressable onPress={onDirections} style={styles.iconButton} accessibilityRole="button" accessibilityLabel="Cómo llegar">
-            <Ionicons name="navigate-outline" size={20} color={colors.ink} />
+            <Ionicons name="navigate-outline" size={20} color={colors.ink} style={styles.directionsIcon} />
           </Pressable>
         </View>
       </View>
@@ -110,6 +114,7 @@ export function RestaurantCard({
 
 const styles = StyleSheet.create({
   card: { gap: space.sm, borderRadius: radius.lg, padding: 2 },
+  framed: { backgroundColor: colors.surfaceAlt, borderWidth: 2, borderColor: colors.line, padding: 0 },
   highlighted: { borderWidth: 2, borderColor: colors.primary, padding: 0 },
   photo: { borderRadius: radius.lg - 2, overflow: 'hidden', backgroundColor: colors.surfaceAlt },
   heart: { position: 'absolute', top: 12, right: 12, filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.45))' } as never,
@@ -124,7 +129,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  miniMapLabel: { color: '#1E1A16', fontSize: font.size.sm, fontWeight: '700' },
   body: { paddingHorizontal: space.xs, gap: 2 },
+  framedBody: { paddingHorizontal: space.sm, paddingBottom: space.md },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   name: { flex: 1, fontSize: font.size.md + 1, fontWeight: '700' },
   rating: { flexDirection: 'row', alignItems: 'center', gap: 3 },
@@ -135,10 +142,20 @@ const styles = StyleSheet.create({
   iconButton: {
     width: 44,
     height: 44,
+    flexShrink: 0,
     borderRadius: 22,
     borderWidth: 1,
     borderColor: colors.line,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  directionsIcon: {
+    width: 20,
+    height: 20,
+    lineHeight: 20,
+    textAlign: 'center',
+    includeFontPadding: false,
+    // Compensa el peso visual de la punta diagonal, arriba y a la derecha.
+    transform: [{ translateX: -2 }, { translateY: 2 }],
   },
 });

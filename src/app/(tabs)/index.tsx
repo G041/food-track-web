@@ -5,7 +5,7 @@ import { Animated, Keyboard, Pressable, ScrollView, StyleSheet, Text, TextInput,
 
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { FadeIn, useMountTransition } from '@/components/motion';
-import { NearbySheet, type SheetSnap } from '@/components/nearby-sheet';
+import { NearbySheet } from '@/components/nearby-sheet';
 import { RatingDialog } from '@/components/rating-dialog';
 import { RestaurantCard } from '@/components/restaurant-card';
 import { RestaurantDetailsModal } from '@/components/restaurant-details-modal';
@@ -13,6 +13,7 @@ import RestaurantMap, { type MapMarker } from '@/components/restaurant-map';
 import { AppText, Button, Chip } from '@/components/ui';
 import { useAuth } from '@/features/auth/auth-provider';
 import { useMapFilters } from '@/features/map/filters-store';
+import { useMapSheet } from '@/features/map/sheet-store';
 import { useMenuViewer } from '@/features/menu/menu-store';
 import {
   useApprovedRestaurants,
@@ -49,7 +50,7 @@ export default function MapScreen() {
   const [searchFocused, setSearchFocused] = useState(false);
   const [catsOpen, setCatsOpen] = useState(false);
   const [catsMounted, catsAnim] = useMountTransition(catsOpen);
-  const [snap, setSnap] = useState<SheetSnap>('half');
+  const { snap, setSnap } = useMapSheet();
   const [onlyFavorites, setOnlyFavorites] = useState(false);
   const [detailsId, setDetailsId] = useState<number | null>(null);
   const [ratingFor, setRatingFor] = useState<Restaurant | null>(null);
@@ -152,7 +153,7 @@ export default function MapScreen() {
         }
         floatingOverMap={
           <Pressable style={styles.locate} onPress={centerOnMe} accessibilityLabel="Centrar en mi ubicación">
-            <Ionicons name={denied ? 'navigate-circle-outline' : 'navigate'} size={22} color={colors.ink} />
+            <Ionicons name={denied ? 'navigate-circle-outline' : 'navigate'} size={22} color={colors.ink} style={[styles.locateIcon, !denied && styles.locateArrow]} />
           </Pressable>
         }>
         {isError ? (
@@ -411,6 +412,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     ...shadow,
   },
+  locateIcon: {
+    width: 22,
+    height: 22,
+    lineHeight: 22,
+    textAlign: 'center',
+    includeFontPadding: false,
+  },
+  // Balance the diagonal arrow's visual weight inside the circular button.
+  locateArrow: { transform: [{ translateX: -2 }, { translateY: 2 }] },
   favFilter: {
     width: 38,
     height: 38,

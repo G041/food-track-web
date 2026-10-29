@@ -1,10 +1,8 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   Animated,
   PanResponder,
   Platform,
-  Pressable,
   StyleSheet,
   Text,
   View,
@@ -14,8 +12,7 @@ import {
 } from 'react-native';
 
 import { colors, font, MAX_CONTENT_WIDTH, radius, shadow, space } from '@/theme/tokens';
-
-export type SheetSnap = 'collapsed' | 'half' | 'full';
+import type { SheetSnap } from '@/features/map/sheet-store';
 
 // Cabecera visible al plegar el panel, con una separación compacta sobre las tabs.
 const HANDLE_AREA = 72;
@@ -164,19 +161,12 @@ export function NearbySheet({
             ref={scrollRef}
             style={{ opacity: listOpacity }}
             scrollEnabled={snap !== 'collapsed'}
-            contentContainerStyle={[styles.list, { paddingBottom: bottomInset + space.xl + (snap === 'full' ? 56 : 0) }]}
+            contentContainerStyle={[styles.list, { paddingBottom: bottomInset + space.xl }]}
             showsVerticalScrollIndicator={false}>
             <View style={styles.listInner}>{children}</View>
           </Animated.ScrollView>
         </View>
       </Animated.View>
-
-      {snap === 'full' && (
-        <Pressable style={[styles.mapButton, { bottom: bottomInset + space.lg }]} onPress={() => onSnapChange('collapsed')} accessibilityRole="button">
-          <Text style={styles.mapButtonText}>Mapa</Text>
-          <Ionicons name="map" size={18} color={colors.inverseFg} />
-        </Pressable>
-      )}
     </>
   );
 }
@@ -198,17 +188,4 @@ const styles = StyleSheet.create({
   subtitle: { fontSize: font.size.xs, color: colors.inkSoft, fontFamily: font.family, textAlign: 'center', marginTop: 1 },
   list: { paddingHorizontal: space.lg, alignItems: 'center' },
   listInner: { width: '100%', maxWidth: MAX_CONTENT_WIDTH, gap: space.xl },
-  mapButton: {
-    position: 'absolute',
-    alignSelf: 'center',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space.sm,
-    paddingHorizontal: space.xl,
-    height: 48,
-    borderRadius: radius.pill,
-    backgroundColor: colors.inverseBg,
-    ...shadow,
-  },
-  mapButtonText: { color: colors.inverseFg, fontWeight: '700', fontSize: font.size.md, fontFamily: font.family },
 });

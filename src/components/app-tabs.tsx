@@ -5,6 +5,7 @@ import { Animated, Platform, Pressable, StyleSheet, Text, View } from 'react-nat
 
 import { usePop } from '@/components/motion';
 import { useAuth } from '@/features/auth/auth-provider';
+import { useMapSheet } from '@/features/map/sheet-store';
 import { usePendingRestaurants } from '@/features/restaurants/queries';
 import { TAB_BAR_HEIGHT, useTabBarBottom } from '@/hooks/use-header-offset';
 import { useKeyboardVisible } from '@/hooks/use-keyboard-visible';
@@ -21,6 +22,7 @@ export default function AppTabs() {
   const { isAdmin } = useAuth();
   const { data: pending } = usePendingRestaurants(isAdmin);
   const keyboard = useKeyboardVisible();
+  const setSnap = useMapSheet((s) => s.setSnap);
 
   const hide = useState(() => new Animated.Value(0))[0];
   useEffect(() => {
@@ -45,7 +47,7 @@ export default function AppTabs() {
           <TabTrigger name="aportar" href="/aportar" asChild>
             <SideTab icon="add-circle-outline" activeIcon="add-circle" label="Aportar" />
           </TabTrigger>
-          <TabTrigger name="mapa" href="/" asChild>
+          <TabTrigger name="mapa" href="/" onPress={() => setSnap('collapsed')} asChild>
             <MapTab />
           </TabTrigger>
           <TabTrigger name="perfil" href="/perfil" asChild>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Children, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   Animated,
   PanResponder,
@@ -11,12 +11,15 @@ import {
   type ViewStyle,
 } from 'react-native';
 
-import { colors, font, MAX_CONTENT_WIDTH, radius, shadow, space } from '@/theme/tokens';
 import type { SheetSnap } from '@/features/map/sheet-store';
+import { colors, font, MAX_CONTENT_WIDTH, radius, shadow, space } from '@/theme/tokens';
 
 // Cabecera visible al plegar el panel, con una separación compacta sobre las tabs.
 const HANDLE_AREA = 72;
 const COLLAPSED_NAV_GAP = 12;
+// Keep room for three 44pt action targets, the photo footer and card padding.
+const MIN_COMPACT_CARD_HEIGHT = 220;
+const COMPACT_HEADER_HEIGHT = 33;
 const ORDER: SheetSnap[] = ['collapsed', 'half', 'full'];
 const native = Platform.OS !== 'web';
 
@@ -35,6 +38,8 @@ export function NearbySheet({
   headerAccessory,
   floatingOverMap,
   scrollKey,
+  onCompactIndexChange,
+  onTopChange,
   children,
 }: {
   snap: SheetSnap;
@@ -50,19 +55,35 @@ export function NearbySheet({
   floatingOverMap?: ReactNode;
   /** Cuando cambia, la lista vuelve arriba. */
   scrollKey?: unknown;
-  children: ReactNode;
+  onCompactIndexChange?: (index: number) => void;
+  /** Top edge of the snapped sheet, relative to its map container. */
+  onTopChange?: (top: number) => void;
+  children: (layout: { compact: boolean; cardHeight: number }) => ReactNode;
 }) {
   const { height: windowHeight } = useWindowDimensions();
   const [measuredHeight, setMeasuredHeight] = useState<number | null>(null);
+  const [headerHeight, setHeaderHeight] = useState(29);
+  const compact = snap === 'half';
   // En iOS instalada, visualViewport (y useWindowDimensions en web) puede excluir zonas
   // del sistema. El panel debe llegar al borde real de su contenedor, igual que las tabs.
   const sheetHeight = measuredHeight ?? Math.max(0, windowHeight - fullTop);
 
   const positions = useMemo(() => {
     const collapsed = Math.max(0, sheetHeight - (bottomInset + COLLAPSED_NAV_GAP + HANDLE_AREA));
-    const half = Math.min(collapsed, Math.max(0, sheetHeight - Math.round((sheetHeight + fullTop) * 0.5)));
+    const halfVisibleHeight = Math.max(
+      Math.round((sheetHeight + fullTop) * 0.5),
+      MIN_COMPACT_CARD_HEIGHT + COMPACT_HEADER_HEIGHT + bottomInset + 22 + space.xs * 2,
+    );
+    const half = Math.min(collapsed, Math.max(0, sheetHeight - halfVisibleHeight));
     return { full: 0, half, collapsed } as Record<SheetSnap, number>;
   }, [sheetHeight, bottomInset, fullTop]);
+
+  useEffect(() => {
+    onTopChange?.(fullTop + positions[snap]);
+  }, [fullTop, positions, snap, onTopChange]);
+
+  // Leave room for the raised central map button as well as the tab bar.
+  const compactHeight = Math.max(0, sheetHeight - positions.half - headerHeight - bottomInset - 22 - space.xs);
 
   const [y] = useState(() => new Animated.Value(positions[snap]));
   const current = useRef(positions[snap]);
@@ -72,6 +93,11 @@ export function NearbySheet({
     latest.current = { positions, snap, onSnapChange };
   });
   const scrollRef = useRef<ScrollViewInstance>(null);
+  const scrollEndTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (scrollEndTimer.current) clearTimeout(scrollEndTimer.current);
+  }, [compact, compactHeight, scrollKey]);
 
   useEffect(() => {
     const id = y.addListener(({ value }) => (current.current = value));
@@ -83,8 +109,9 @@ export function NearbySheet({
   }, [snap, positions, y]);
 
   useEffect(() => {
-    scrollRef.current?.scrollTo({ y: 0, animated: true });
-  }, [scrollKey]);
+    scrollRef.current?.scrollTo({ y: 0, animated: false });
+    if (compact) onCompactIndexChange?.(0);
+  }, [scrollKey, compact, onCompactIndexChange]);
 
   // Los handlers leen refs solo cuando ocurre el gesto (no durante el render).
   // eslint-disable-next-line react-hooks/refs
@@ -145,25 +172,42 @@ export function NearbySheet({
         <View style={styles.panel}>
           <View
             {...responder.panHandlers}
+            onLayout={(event) => setHeaderHeight(event.nativeEvent.layout.height)}
             style={[styles.header, Platform.OS === 'web' && ({ touchAction: 'none', cursor: 'grab' } as unknown as ViewStyle)]}
             accessibilityRole="adjustable"
             accessibilityLabel="Panel de lugares cercanos: arrastrá para abrir o cerrar">
             <View style={styles.handle} />
-            <View style={styles.titleRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.title}>{title}</Text>
-                {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
+            {!compact && (
+              <View style={styles.titleRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.title}>{title}</Text>
+                  {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
+                </View>
+                {headerAccessory}
               </View>
-              {headerAccessory}
-            </View>
+            )}
           </View>
           <Animated.ScrollView
             ref={scrollRef}
-            style={{ opacity: listOpacity }}
+            style={[{ opacity: listOpacity }, compact && { height: compactHeight, flexGrow: 0, flexShrink: 0 }]}
             scrollEnabled={snap !== 'collapsed'}
-            contentContainerStyle={[styles.list, { paddingBottom: bottomInset + space.xl }]}
+            pagingEnabled={compact}
+            directionalLockEnabled
+            nestedScrollEnabled
+            decelerationRate={compact ? 'fast' : 'normal'}
+            scrollEventThrottle={32}
+            onScroll={(event) => {
+              if (!compact || compactHeight <= 0) return;
+              const index = Math.max(0, Math.round(event.nativeEvent.contentOffset.y / compactHeight));
+              if (scrollEndTimer.current) clearTimeout(scrollEndTimer.current);
+              // Wait for touch momentum / CSS scroll snapping to settle before moving the map.
+              scrollEndTimer.current = setTimeout(() => onCompactIndexChange?.(index), 150);
+            }}
+            contentContainerStyle={[styles.list, { gap: compact ? 0 : space.xl, paddingBottom: compact ? 0 : bottomInset + space.xl }]}
             showsVerticalScrollIndicator={false}>
-            <View style={styles.listInner}>{children}</View>
+            {Children.map(children({ compact, cardHeight: compactHeight - space.xs }), (child) => (
+              <View style={[styles.listInner, compact && { height: compactHeight, paddingBottom: space.xs }]}>{child}</View>
+            ))}
           </Animated.ScrollView>
         </View>
       </Animated.View>
@@ -186,6 +230,6 @@ const styles = StyleSheet.create({
   titleRow: { flexDirection: 'row', alignItems: 'center', width: '100%', maxWidth: MAX_CONTENT_WIDTH, gap: space.sm },
   title: { fontSize: font.size.md, fontWeight: '800', color: colors.ink, fontFamily: font.family, textAlign: 'center' },
   subtitle: { fontSize: font.size.xs, color: colors.inkSoft, fontFamily: font.family, textAlign: 'center', marginTop: 1 },
-  list: { paddingHorizontal: space.lg, alignItems: 'center' },
-  listInner: { width: '100%', maxWidth: MAX_CONTENT_WIDTH, gap: space.xl },
+  list: { paddingHorizontal: space.lg, alignItems: 'stretch' },
+  listInner: { width: '100%', maxWidth: MAX_CONTENT_WIDTH, alignSelf: 'center' },
 });

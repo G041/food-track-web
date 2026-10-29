@@ -13,6 +13,10 @@ export type RestaurantMapProps = {
   userLocation?: LatLng | null;
   /** Cada vez que cambia, el mapa vuela a ese punto. */
   focus?: (LatLng & { zoom?: number }) | null;
+  /** Current compact card; changes move the map without blocking manual location controls. */
+  previewFocus?: (LatLng & { zoom?: number }) | null;
+  /** Vertical center of the map area between the search bar and sheet, in container pixels. */
+  focusCenterY?: number;
   initialCenter: LatLng;
   initialZoom?: number;
   /** Modo "elegir ubicación": muestra un pin arrastrable. */

@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Animated, Keyboard, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { ConfirmDialog } from '@/components/confirm-dialog';
@@ -47,6 +47,9 @@ export default function MapScreen() {
   const { location, denied, locate } = useUserLocation();
 
   const [focus, setFocus] = useState<(LatLng & { zoom?: number }) | null>(null);
+  const [sheetTop, setSheetTop] = useState(0);
+  const [searchBounds, setSearchBounds] = useState({ y: 0, height: SEARCH_HEIGHT });
+  const [compactIndex, setCompactIndex] = useState(0);
   const [searchFocused, setSearchFocused] = useState(false);
   const [catsOpen, setCatsOpen] = useState(false);
   const [catsMounted, catsAnim] = useMountTransition(catsOpen);
@@ -77,6 +80,18 @@ export default function MapScreen() {
     );
     return withDistance;
   }, [visible, location]);
+
+  const nearbyKey = nearby.map(({ r }) => r.id).join(',');
+  const compactRestaurant = nearby[Math.min(compactIndex, nearby.length - 1)]?.r;
+  const previewFocus = useMemo(() => compactRestaurant ? {
+    latitude: compactRestaurant.latitude,
+    longitude: compactRestaurant.longitude,
+    zoom: 15,
+  } : null, [compactRestaurant]);
+  useEffect(() => {
+    if (snap !== 'half' || !compactRestaurant) return;
+    select(compactRestaurant.id);
+  }, [snap, compactRestaurant, select, nearbyKey]);
 
   const markers: MapMarker[] = visible.map((r) => ({
     id: r.id,
@@ -127,6 +142,8 @@ export default function MapScreen() {
         }}
         userLocation={location}
         focus={focus}
+        previewFocus={snap === 'half' ? previewFocus : null}
+        focusCenterY={snap === 'half' && sheetTop > 0 ? (headerTop + searchBounds.y + searchBounds.height + sheetTop) / 2 : undefined}
         initialCenter={DEFAULT_CENTER}
         initialZoom={11.5}
       />
@@ -137,6 +154,9 @@ export default function MapScreen() {
         onSnapChange={setSnap}
         fullTop={headerTop + SEARCH_HEIGHT + space.lg + (isDemo || activeCategory ? 30 : 0)}
         bottomInset={tabBarSpace}
+        scrollKey={nearbyKey}
+        onCompactIndexChange={setCompactIndex}
+        onTopChange={setSheetTop}
         title={title}
         subtitle={location && !isLoading ? 'Ordenados por distancia' : undefined}
         headerAccessory={
@@ -156,7 +176,7 @@ export default function MapScreen() {
             <Ionicons name={denied ? 'navigate-circle-outline' : 'navigate'} size={22} color={colors.ink} style={[styles.locateIcon, !denied && styles.locateArrow]} />
           </Pressable>
         }>
-        {isError ? (
+        {({ compact, cardHeight }) => isError ? (
           <View style={styles.empty}>
             <AppText variant="heading">No pudimos cargar los lugares</AppText>
             <Button title="Reintentar" icon="refresh" onPress={() => refetch()} />
@@ -175,6 +195,7 @@ export default function MapScreen() {
             <RestaurantCard
               key={r.id}
               framed
+              compactHeight={compact ? cardHeight : undefined}
               restaurant={r}
               distance={d}
               stats={stats[r.id]}
@@ -194,7 +215,10 @@ export default function MapScreen() {
       {/* Búsqueda + categorías (por encima del panel) */}
       <View style={[styles.top, { paddingTop: headerTop }]} pointerEvents="box-none">
         <View style={styles.topInner} pointerEvents="box-none">
-          <View style={styles.searchBox}>
+          <View style={styles.searchBox} onLayout={(event) => {
+            const { y, height } = event.nativeEvent.layout;
+            setSearchBounds({ y, height });
+          }}>
             <Ionicons name="search" size={20} color={colors.inkSoft} />
             <TextInput
               value={search}

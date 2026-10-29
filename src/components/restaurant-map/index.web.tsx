@@ -2,7 +2,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { setWorkerUrl } from 'maplibre-gl';
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { Map, Marker, type MapRef } from 'react-map-gl/maplibre';
 import { StyleSheet, View } from 'react-native';
 
@@ -17,6 +17,11 @@ export type { MapMarker, RestaurantMapProps } from './types';
 // Metro no empaqueta el worker de MapLibre: se copia a public/ en postinstall.
 setWorkerUrl('/maplibre-gl-worker.mjs');
 
+const SELECTED_PIN_SIZE = 44;
+const PIN_TIP_HEIGHT = 8;
+// The geographic anchor is the tip; visually center the circular marker above it.
+const SELECTED_PIN_CENTER_OFFSET = SELECTED_PIN_SIZE / 2 + PIN_TIP_HEIGHT - 1;
+
 export default function RestaurantMap({
   markers = [],
   selectedId,
@@ -24,6 +29,8 @@ export default function RestaurantMap({
   onMapPress,
   userLocation,
   focus,
+  previewFocus,
+  focusCenterY,
   initialCenter,
   initialZoom = 12,
   pickedPoint,
@@ -32,20 +39,36 @@ export default function RestaurantMap({
   const mapRef = useRef<MapRef>(null);
   const theme = useResolvedTheme();
 
-  useEffect(() => {
-    if (!focus) return;
-    mapRef.current?.flyTo({
-      center: [focus.longitude, focus.latitude],
-      zoom: focus.zoom ?? Math.max(mapRef.current.getZoom(), 14),
+  const focusMap = useCallback((target: NonNullable<RestaurantMapProps['focus']>, centerRestaurantPin = false) => {
+    const map = mapRef.current;
+    if (!map) return;
+    const offsetY = focusCenterY == null ? 0 : focusCenterY - map.getCanvas().clientHeight / 2
+      + (centerRestaurantPin ? SELECTED_PIN_CENTER_OFFSET : 0);
+    map.flyTo({
+      center: [target.longitude, target.latitude],
+      zoom: target.zoom ?? Math.max(map.getZoom(), 14),
       duration: 700,
+      offset: [0, offsetY],
     });
-  }, [focus]);
+  }, [focusCenterY]);
+
+  useEffect(() => {
+    if (focus) focusMap(focus);
+  }, [focus, focusMap]);
+
+  useEffect(() => {
+    if (previewFocus) focusMap(previewFocus, true);
+  }, [previewFocus, focusMap]);
 
   return (
     <View style={styles.container}>
       <Map
         ref={mapRef}
         initialViewState={{ ...initialCenter, zoom: initialZoom }}
+        onLoad={() => {
+          const target = previewFocus ?? focus;
+          if (target) focusMap(target, !!previewFocus);
+        }}
         mapStyle={MAP_STYLE_URLS[theme]}
         attributionControl={{ compact: true }}
         style={{ position: 'absolute', inset: 0 }}
@@ -113,14 +136,14 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#fff',
   },
-  pinSelected: { width: 44, height: 44, borderRadius: 22, borderWidth: 3 },
+  pinSelected: { width: SELECTED_PIN_SIZE, height: SELECTED_PIN_SIZE, borderRadius: SELECTED_PIN_SIZE / 2, borderWidth: 3 },
   pinTip: {
     width: 0,
     height: 0,
     marginTop: -1,
     borderLeftWidth: 6,
     borderRightWidth: 6,
-    borderTopWidth: 8,
+    borderTopWidth: PIN_TIP_HEIGHT,
     borderLeftColor: 'transparent',
     borderRightColor: 'transparent',
   },

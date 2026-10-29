@@ -1,8 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ART_VARIANTS, CategoryArt } from '@/components/category-art';
-import { PhotoCarousel } from '@/components/photo-carousel';
+import { PhotoCarousel, PhotoPagination } from '@/components/photo-carousel';
 import { AppText, Button } from '@/components/ui';
 import type { RatingStats, Restaurant } from '@/lib/api';
 import { categoryMeta } from '@/lib/categories';
@@ -10,6 +11,7 @@ import { formatDistance } from '@/lib/geo';
 import { colors, font, radius, space } from '@/theme/tokens';
 
 const PHOTO_HEIGHT = 210;
+const COMPACT_ACTION_WIDTH = 52;
 
 export function formatRating(stats?: RatingStats) {
   if (!stats || stats.count === 0) return null;
@@ -25,6 +27,7 @@ export function RestaurantCard({
   myRating,
   favorite,
   framed = false,
+  compactHeight,
   highlighted,
   onToggleFavorite,
   onLocate,
@@ -38,6 +41,7 @@ export function RestaurantCard({
   myRating?: number;
   favorite: boolean;
   framed?: boolean;
+  compactHeight?: number;
   highlighted?: boolean;
   onToggleFavorite: () => void;
   onLocate?: () => void;
@@ -47,6 +51,56 @@ export function RestaurantCard({
 }) {
   const meta = categoryMeta(r.category);
   const rating = formatRating(stats);
+  const [compactImageIndex, setCompactImageIndex] = useState(0);
+
+  if (compactHeight != null) {
+    const imageHeight = Math.max(0, compactHeight - 4 - space.sm * 3 - 44);
+    return (
+      <View style={[styles.compactCard, { height: compactHeight }, highlighted && { borderColor: colors.primary }]}>
+        <View style={[styles.compactPhotoRow, { height: imageHeight }]}>
+          <View style={styles.compactPhoto}>
+            <PhotoCarousel
+              height={imageHeight}
+              showIndicators={false}
+              onIndexChange={setCompactImageIndex}
+              slides={Array.from({ length: ART_VARIANTS }, (_, i) => (
+                <CategoryArt key={i} category={r.category} variant={i} seed={r.id} />
+              ))}
+            />
+          </View>
+          <View style={[styles.compactActions, { height: imageHeight }]}>
+            <Pressable onPress={onOpenMenu} style={[styles.compactActionButton, styles.compactMenuButton]} accessibilityRole="button" accessibilityLabel="Ver menú">
+              <Ionicons name="restaurant" size={24} color="#fff" />
+            </Pressable>
+            <Pressable onPress={onRate} style={styles.compactActionButton} accessibilityRole="button" accessibilityLabel={myRating ? `Calificar: tu nota actual es ${myRating}` : 'Calificar'}>
+              <Ionicons name="star-outline" size={24} color={colors.ink} />
+            </Pressable>
+            <Pressable onPress={onDirections} style={[styles.iconButton, styles.compactDirectionsButton]} accessibilityRole="button" accessibilityLabel="Cómo llegar">
+              <Ionicons name="navigate-outline" size={20} color={colors.ink} style={styles.directionsIcon} />
+            </Pressable>
+          </View>
+          <PhotoPagination count={ART_VARIANTS} index={compactImageIndex} insetRight={COMPACT_ACTION_WIDTH + space.sm} />
+        </View>
+        <View style={styles.compactFooter}>
+            <View style={styles.compactInfo}>
+              <AppText style={styles.compactName} numberOfLines={1}>{r.name}</AppText>
+              <AppText variant="small" style={styles.compactMeta} numberOfLines={1}>
+                <AppText variant="small" style={{ color: meta.color, fontWeight: '700' }}>{meta.name}</AppText>
+                {distance != null ? ` · a ${formatDistance(distance)}` : ''}
+              </AppText>
+            </View>
+            <Pressable
+              onPress={onToggleFavorite}
+              style={styles.compactFavorite}
+              accessibilityRole="button"
+              accessibilityState={{ selected: favorite }}
+              accessibilityLabel={favorite ? `Quitar ${r.name} de favoritos` : `Guardar ${r.name} en favoritos`}>
+              <Ionicons name={favorite ? 'heart' : 'heart-outline'} size={22} color={favorite ? '#FF385C' : colors.ink} />
+            </Pressable>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.card, framed && styles.framed, highlighted && styles.highlighted]}>
@@ -113,6 +167,18 @@ export function RestaurantCard({
 }
 
 const styles = StyleSheet.create({
+  compactCard: { borderRadius: radius.lg, borderWidth: 2, borderColor: colors.line, backgroundColor: colors.surfaceAlt, padding: space.sm, gap: space.sm },
+  compactPhotoRow: { flexDirection: 'row', gap: space.sm },
+  compactPhoto: { flex: 1, minWidth: 0, borderRadius: radius.md, overflow: 'hidden' },
+  compactFooter: { height: 44, flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  compactInfo: { flex: 1, gap: 2, minWidth: 0 },
+  compactName: { fontSize: font.size.md + 1, fontWeight: '700', textAlign: 'center' },
+  compactMeta: { textAlign: 'center' },
+  compactFavorite: { width: COMPACT_ACTION_WIDTH, height: 44, alignItems: 'center', justifyContent: 'center' },
+  compactActions: { width: COMPACT_ACTION_WIDTH, gap: space.sm },
+  compactActionButton: { flex: 1, minHeight: 44, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line, alignItems: 'center', justifyContent: 'center' },
+  compactDirectionsButton: { width: COMPACT_ACTION_WIDTH },
+  compactMenuButton: { backgroundColor: colors.primary, borderColor: colors.primary },
   card: { gap: space.sm, borderRadius: radius.lg, padding: 2 },
   framed: { backgroundColor: colors.surfaceAlt, borderWidth: 2, borderColor: colors.line, padding: 0 },
   highlighted: { borderWidth: 2, borderColor: colors.primary, padding: 0 },
@@ -130,8 +196,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   miniMapLabel: { color: '#1E1A16', fontSize: font.size.sm, fontWeight: '700' },
-  body: { paddingHorizontal: space.xs, gap: 2 },
-  framedBody: { paddingHorizontal: space.sm, paddingBottom: space.md },
+  body: { gap: 2 },
+  framedBody: { paddingBottom: space.md },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   name: { flex: 1, fontSize: font.size.md + 1, fontWeight: '700' },
   rating: { flexDirection: 'row', alignItems: 'center', gap: 3 },

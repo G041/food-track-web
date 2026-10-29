@@ -18,6 +18,24 @@ body {
   font-family: var(--font-display);
 }
 
+/* En iOS instalada, fijar html/body con inset: 0 puede recortar el viewport por el alto
+   de las zonas del sistema y dejar una franja vacía debajo de la app (WebKit 237961).
+   En modo standalone usamos el alto completo en vh y dejamos el documento sin scroll.
+   No usar svh ni visualViewport.height aquí: pueden excluir esas zonas (WebKit 254868). */
+@media (display-mode: standalone) {
+  html,
+  body {
+    position: relative;
+    inset: auto;
+    height: 100vh;
+  }
+
+  #root {
+    height: 100vh;
+    overflow: hidden;
+  }
+}
+
 body {
   /* Sin selección de texto, menú de "copiar/buscar" al mantener apretado ni resaltado al tocar */
   -webkit-user-select: none;

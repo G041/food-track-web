@@ -14,6 +14,7 @@ function measureEnv(): Probe {
     'position:fixed;visibility:hidden;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)';
   document.body.appendChild(el);
   const cs = getComputedStyle(el);
+  const root = document.getElementById('root')?.getBoundingClientRect();
   const r = {
     'env top': cs.paddingTop,
     'env bottom': cs.paddingBottom,
@@ -24,6 +25,8 @@ function measureEnv(): Probe {
     ...r,
     standalone: window.matchMedia('(display-mode: standalone)').matches || (navigator as { standalone?: boolean }).standalone === true,
     ventana: `${window.innerWidth}×${window.innerHeight}`,
+    documento: `${document.documentElement.clientWidth}×${document.documentElement.clientHeight}`,
+    'app (#root)': root ? `${Math.round(root.width)}×${Math.round(root.height)} (borde inferior: ${Math.round(root.bottom)})` : '—',
     pantalla: `${screen.width}×${screen.height} @${window.devicePixelRatio}x`,
     'visual viewport': window.visualViewport ? `${Math.round(window.visualViewport.width)}×${Math.round(window.visualViewport.height)}` : '—',
     navegador: navigator.userAgent.replace(/^.*?\(([^)]*)\).*$/, '$1').slice(0, 60),
@@ -50,7 +53,11 @@ export function SafeAreaDebug() {
     const update = () => setEnv(measureEnv());
     update();
     window.addEventListener('resize', update);
-    return () => window.removeEventListener('resize', update);
+    window.visualViewport?.addEventListener('resize', update);
+    return () => {
+      window.removeEventListener('resize', update);
+      window.visualViewport?.removeEventListener('resize', update);
+    };
   }, [visible]);
 
   if (!visible) return null;

@@ -56,14 +56,17 @@ export function NearbySheet({
   scrollKey?: unknown;
   children: ReactNode;
 }) {
-  const { height } = useWindowDimensions();
-  const sheetHeight = Math.max(0, height - fullTop);
+  const { height: windowHeight } = useWindowDimensions();
+  const [measuredHeight, setMeasuredHeight] = useState<number | null>(null);
+  // En iOS instalada, visualViewport (y useWindowDimensions en web) puede excluir zonas
+  // del sistema. El panel debe llegar al borde real de su contenedor, igual que las tabs.
+  const sheetHeight = measuredHeight ?? Math.max(0, windowHeight - fullTop);
 
   const positions = useMemo(() => {
     const collapsed = Math.max(0, sheetHeight - (bottomInset + MAP_BUTTON_OVERHANG + HANDLE_AREA));
-    const half = Math.min(collapsed, Math.max(0, sheetHeight - Math.round(height * 0.5)));
+    const half = Math.min(collapsed, Math.max(0, sheetHeight - Math.round((sheetHeight + fullTop) * 0.5)));
     return { full: 0, half, collapsed } as Record<SheetSnap, number>;
-  }, [sheetHeight, bottomInset, height]);
+  }, [sheetHeight, bottomInset, fullTop]);
 
   const [y] = useState(() => new Animated.Value(positions[snap]));
   const current = useRef(positions[snap]);
@@ -136,7 +139,8 @@ export function NearbySheet({
     <>
       <Animated.View
         pointerEvents="box-none"
-        style={[styles.sheet, { top: fullTop, height: sheetHeight, transform: [{ translateY: y }] }]}>
+        onLayout={(event) => setMeasuredHeight(event.nativeEvent.layout.height)}
+        style={[styles.sheet, { top: fullTop, bottom: 0, transform: [{ translateY: y }] }]}>
         {floatingOverMap && (
           <Animated.View pointerEvents={snap === 'full' ? 'none' : 'box-none'} style={[styles.floating, { opacity: floatingOpacity }]}>
             {floatingOverMap}

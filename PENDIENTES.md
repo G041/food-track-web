@@ -4,12 +4,15 @@ Estado al 28/10/2026. **La app está en producción:** https://food-track-web.ve
 
 Lo que sigue está ordenado por prioridad. Cada ítem es una casilla para tachar cuando se resuelve.
 
+Revisión del backlog: las aclaraciones de implementación se contrastaron con el código local. Esta revisión no verifica nuevamente producción ni reemplaza las pruebas de registro, instalación y cámara en dispositivos reales que siguen pendientes.
+
 ---
 
 ## 🔴 1. Bloqueantes para usar la app de verdad
 
 - [x] **Base en Supabase** (proyecto `shqlyaqbymsngvakpwyw`, us-east-1): esquema y 28 restaurantes aplicados con `supabase db push --include-seed`. Verificado vía API: anónimo ve 28 aprobados, no puede insertar ni moderar, `restaurants_nearby` responde.
-- [x] **Reglas de moderación probadas** contra Postgres + PostGIS local (PGlite): 24 verificaciones en `supabase/tests/db.test.mjs` (`npm run test:db`, corre en la CI). Falta repetirlas una vez contra el proyecto Supabase real.
+- [x] **Tests de base y RLS implementados** contra Postgres + PostGIS local (PGlite): `supabase/tests/db.test.mjs` cubre moderación, permisos, notas de admin, calificaciones y favoritos (`npm run test:db`, incluido en la CI).
+- [ ] **Repetir las verificaciones de permisos y moderación contra Supabase real**, con cuentas y datos de prueba controlados. La suite local no reemplaza esta validación.
 - [x] **Primer admin:** la cuenta `gianni` es admin (28/10/2026). Para sumar otro: `npx supabase db query --linked "update public.profiles set role='admin' where username='…'"`.
 - [x] **Login con nombre de usuario funcionando en producción** (28/10/2026), tras recargar `SUPABASE_SECRET_KEY` revelada. `api/login` registra en los logs de Vercel en qué paso falla cada intento.
 - [x] **El modo demo ya no se activa solo en producción:** sin credenciales, la build publicada muestra "Falta configurar el backend". Para publicar una demo a propósito: `EXPO_PUBLIC_DEMO=true`.
@@ -34,6 +37,7 @@ Lo que sigue está ordenado por prioridad. Cada ítem es una casilla para tachar
 - [x] Contraseña: botón para verla u ocultarla; tras un login fallido, la primera tecla de borrar la vacía entera; al crear cuenta se pide repetirla.
 - [x] **Notas del equipo** (solo admins) en Perfil: tabla `admin_notes` con RLS (migración `20261028000000`), crear, marcar como hecha y borrar.
 - [ ] **Probar en iPhone y Android instalada** (Compartir → "Agregar a inicio" / menú → "Instalar app"): zoom, barra de estado, teclado y cámara.
+- [ ] **Verificar la franja vacía debajo de la navegación en iOS instalada:** corrección local en `src/global.css` para usar `100vh` sin fijar `html/body` en modo standalone. Falta confirmar en iPhone después de publicar: abrir en frío, rotar, abrir/cerrar el teclado y volver desde segundo plano. El diagnóstico ahora muestra también el tamaño del documento y de `#root`.
 - [ ] **Rate limit del login con usuario:** las llamadas a Supabase salen desde las IPs de Vercel. Con mucho tráfico conviene limitar los intentos por usuario.
 
 ## 🟠 2. Funcionalidad que falta
@@ -48,26 +52,23 @@ Lo que sigue está ordenado por prioridad. Cada ítem es una casilla para tachar
 - [ ] **Corregir los menús rotos de la v1:** Blossom, El Querandí y Saint Elmo dan 404; Soffice es un Drive privado; Adelmo no resuelve DNS. Hay que pedir los links nuevos o despublicarlos desde el panel de admin.
 - [ ] **Menús que bloquean el iframe** (McDonald's, KFC, Starbucks, Garibaldi, Fabric Sushi, Vecino): en web solo se pueden abrir afuera. En la app nativa sí se van a ver dentro (WebView no tiene esa restricción). Opcional: mostrar una captura de la página con un servicio de screenshots.
 - [ ] **Recuperar contraseña** (`supabase.auth.resetPasswordForEmail`) y una pantalla para fijar la nueva.
-- [ ] **Login con nombre de usuario.** Hoy solo funciona con email, porque Supabase Auth lo requiere. Haría falta una RPC que resuelva username → email sin exponer los emails.
 - [ ] **Editar un aporte pendiente.** La base ya lo permite (vuelve a quedar pendiente), pero no hay UI.
 - [ ] **Admin: gestionar lo ya publicado.** Falta poder despublicar o borrar restaurantes aprobados, ver el historial de rechazados y editar datos. Hoy el panel solo muestra la cola de pendientes.
 - [ ] **Ficha compartible `/restaurant/[id]`** con URL propia (estaba en el plan; hoy la ficha es solo un panel sobre el mapa).
-- [ ] **"Cerca mío":** la RPC `restaurants_nearby` existe en la base, pero no se usa.
 - [ ] **Encuadre inicial del mapa.** Arranca en el Obelisco con zoom 11.5 y los locales de zona norte (San Isidro, Olivos) quedan fuera de la vista. Convendría ajustar a los marcadores (`fitBounds`) o a la ubicación del usuario.
-- [ ] **Escalar la consulta de restaurantes.** `listApproved` trae toda la tabla. Con muchos datos, hay que filtrar por área visible y agrupar pines cercanos (clustering).
+- [ ] **Escalar la consulta de restaurantes.** `listApproved` trae todos los aprobados y el panel "cerca tuyo" calcula y ordena distancias en el cliente (`src/app/(tabs)/index.tsx`, `src/lib/geo.ts`). La RPC `restaurants_nearby` existe y tiene una prueba local, pero la app no la llama. Evaluar usarla para consultas por cercanía, filtrar por área visible y agrupar pines cercanos (clustering) cuando crezca el volumen de datos.
 - [ ] **Geocodificación:** autocompletar la dirección a partir del pin, o el pin a partir de la dirección.
 - [ ] **Ranking de puntos.** Los puntos se suman al aprobar, pero no se muestran en ningún ranking.
 - [ ] **Reportar datos incorrectos** de un lugar publicado (link roto, local cerrado).
 
 ## 🟡 3. Diseño, UX y marca
 
-- [ ] **Íconos y splash propios.** `assets/images/icon.png`, `favicon.png`, `splash-icon.png`, los íconos de Android y `assets/expo.icon` (iOS) siguen siendo los de la plantilla de Expo. Se puede reutilizar el logo de la v1.
-- [ ] **PWA completa:** manifest con íconos de 192/512 px y probar "Agregar a pantalla de inicio".
+- [ ] **Completar la marca en los assets de Expo.** Los assets configurados en `app.json` (`assets/images/icon.png`, `favicon.png`, `splash-icon.png`, los íconos de Android y `assets/expo.icon` para iOS) siguen pendientes de revisión y reemplazo donde corresponda. Los íconos web de instalación en `public/icons/` ya existen; son un conjunto separado.
+- [x] **Manifest e íconos de instalación web implementados:** `public/manifest.json` incluye íconos de 192/512 px y uno maskable; `public/index.html` enlaza el manifest y el ícono de inicio de iOS. La prueba de instalación en iPhone y Android sigue pendiente en "Sensación de app nativa".
 - [ ] **Layout de escritorio:** lista lateral de resultados junto al mapa (hoy es el diseño mobile estirado).
 - [ ] **Estados de carga y error:** skeletons en las listas y un aviso si no cargan los tiles del mapa.
 - [ ] **Revisión de accesibilidad:** etiquetas en todos los botones con ícono, contraste y navegación con teclado.
 - [ ] La fuente se carga desde Google Fonts con un `@import` en CSS. Evaluar `expo-font` o alojarla en el propio sitio.
-- [ ] **Modo oscuro** (opcional; hoy `userInterfaceStyle` está fijo en `light`).
 
 ## 👥 Colaboración en equipo
 
@@ -79,11 +80,9 @@ Lo que sigue está ordenado por prioridad. Cada ítem es una casilla para tachar
 
 ## 🔵 4. Calidad y mantenimiento
 
-- [ ] **Tests:** no hay. Faltan:
-  - Unitarios de `validation.ts` y del filtro del mapa.
-  - Tests de RLS en SQL.
-  - Un e2e con Playwright en `e2e/` que reproduzca el flujo probado a mano: registro → aporte → aprobación → aparece en el mapa.
-- [x] **CI en GitHub Actions en verde** (lint, typecheck y build). La primera ejecución fallaba en `npm ci` por el lockfile desincronizado y la carpeta `public/` faltante; se corrigió en `858bf1f`.
+- [ ] **Tests unitarios de la app:** agregar cobertura de `validation.ts` y del filtro del mapa. Los tests de base y RLS ya existen (ver sección 1).
+- [ ] **Test e2e con Playwright** en `e2e/`: registro → aporte → aprobación → aparece en el mapa.
+- [x] **CI en GitHub Actions configurada** con lint, typecheck, tests de base y build (`.github/workflows/ci.yml`). La primera ejecución fallaba en `npm ci` por el lockfile desincronizado y la carpeta `public/` faltante; se corrigió en `858bf1f`. El estado de la última ejecución debe consultarse en GitHub.
 - [ ] **Tipos generados** desde el esquema con `npx supabase gen types typescript` (hoy `src/lib/api/types.ts` está escrito a mano).
 - [ ] **Agregar `.gitattributes`** (`* text=auto eol=lf`) para evitar los avisos de LF/CRLF en Windows.
 - [ ] **Revisar `npm audit`** (hay avisos en dependencias transitivas).
@@ -92,6 +91,7 @@ Lo que sigue está ordenado por prioridad. Cada ítem es una casilla para tachar
 
 ## 🟣 5. Camino a la app nativa
 
+- [ ] **Tema dinámico en nativo:** web ya permite claro, oscuro o sistema. `useResolvedTheme` en `src/theme/theme-store.ts` devuelve siempre `light` fuera de web y `app.json` mantiene `userInterfaceStyle: "light"`.
 - [ ] Implementar `src/components/restaurant-map/index.tsx` con `@maplibre/maplibre-react-native` respetando `RestaurantMapProps` (hoy muestra un marcador de lugar).
 - [ ] Crear un **development build** con EAS: MapLibre nativo no corre en Expo Go. Falta agregar `eas.json`.
 - [ ] Sesión en nativo: hoy usa AsyncStorage. Evaluar SecureStore cifrado y refrescar la sesión al volver a primer plano (`AppState` + `startAutoRefresh`).

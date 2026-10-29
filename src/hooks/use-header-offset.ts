@@ -9,6 +9,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 // env(safe-area-inset-top) = 0 en ese modo, así que se estima el alto según el tamaño de pantalla.
 
 export const HEADER_GAP = 12;
+// Separación adicional para que los encabezados queden debajo del difuminado de iOS instalada.
+const IOS_SCROLL_EDGE_CLEARANCE = 16;
 export const TAB_BAR_HEIGHT = 68;
 const TAB_BAR_GAP = 12;
 // El indicador de inicio de iOS ocupa ~34px de zona segura, pero la línea visible está en los
@@ -37,7 +39,7 @@ export function useStatusBarInset() {
 
 /** Distancia desde el borde superior hasta el contenido del encabezado. */
 export function useHeaderOffset() {
-  return useStatusBarInset() + HEADER_GAP;
+  return useStatusBarInset() + HEADER_GAP + (isIosStandalone() ? IOS_SCROLL_EDGE_CLEARANCE : 0);
 }
 
 /** Distancia desde el borde inferior hasta la barra de tabs flotante. */

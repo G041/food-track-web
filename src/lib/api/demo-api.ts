@@ -124,6 +124,13 @@ export function createDemoApi(): Api {
       save();
     },
 
+    async deleteRestaurant(id) {
+      await delay();
+      if (me()?.role !== 'admin') throw new ApiError('Solo un administrador puede eliminar menús.');
+      state.restaurants = state.restaurants.filter((r) => r.id !== id);
+      save();
+    },
+
     async review(id, decision, note) {
       await delay();
       if (me()?.role !== 'admin') throw new ApiError('Solo un administrador puede revisar aportes.');

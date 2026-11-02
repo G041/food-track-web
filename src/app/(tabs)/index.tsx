@@ -206,7 +206,7 @@ export default function MapScreen() {
               highlighted={r.id === selectedId}
               onToggleFavorite={() => (session ? toggleFavorite.mutate({ id: r.id, on: !favorites.has(r.id) }) : setAskLogin(true))}
               onLocate={() => locateOnMap(r)}
-              onOpenMenu={() => openMenu({ name: r.name, url: r.menu_url, category: r.category })}
+              onOpenMenu={() => openMenu({ id: r.id, name: r.name, url: r.menu_url, category: r.category })}
               onRate={() => setRatingFor(r)}
               onDirections={() => openDirections(r.latitude, r.longitude)}
               onReport={() => setReportFor(r)}
@@ -352,7 +352,7 @@ export default function MapScreen() {
           }}
           onOpenMenu={() => {
             setDetailsId(null);
-            openMenu({ name: detailsRestaurant.name, url: detailsRestaurant.menu_url, category: detailsRestaurant.category });
+            openMenu({ id: detailsRestaurant.id, name: detailsRestaurant.name, url: detailsRestaurant.menu_url, category: detailsRestaurant.category });
           }}
           onRate={() => {
             setDetailsId(null);

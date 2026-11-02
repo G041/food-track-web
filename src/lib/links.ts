@@ -1,11 +1,35 @@
 import * as Linking from 'expo-linking';
-import * as WebBrowser from 'expo-web-browser';
 import { Platform } from 'react-native';
 
-// En web abre una pestaña nueva; en nativo, el navegador in-app.
-// No se embebe el menú: muchos sitios bloquean iframes (X-Frame-Options).
+function isInstalledWebApp() {
+  return window.matchMedia('(display-mode: standalone)').matches || (navigator as { standalone?: boolean }).standalone === true;
+}
+
+/**
+ * Abre el menú en el navegador predeterminado del usuario, fuera de FoodTrack.
+ * Se usa cuando el sitio no se puede mostrar dentro de la app (muchos bloquean iframes con X-Frame-Options).
+ */
 export function openMenu(url: string) {
-  return WebBrowser.openBrowserAsync(url);
+  if (Platform.OS !== 'web') return Linking.openURL(url);
+
+  const ua = navigator.userAgent;
+  const ios = /iPad|iPhone|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+  if (isInstalledWebApp()) {
+    // Desde la app instalada, un link normal se abre en una ventana interna de la propia app.
+    if (ios) {
+      // Esquema de iOS que entrega el link a Safari.
+      window.location.href = url.replace(/^http/i, 'x-safari-http');
+      return;
+    }
+    if (/Android/.test(ua)) {
+      // Intent de Android: abre el link con el navegador predeterminado.
+      const parsed = new URL(url);
+      window.location.href = `intent://${parsed.host}${parsed.pathname}${parsed.search}#Intent;scheme=${parsed.protocol.replace(':', '')};action=android.intent.action.VIEW;end`;
+      return;
+    }
+  }
+  // Navegador común o computadora: pestaña nueva, ya en el navegador del usuario.
+  window.open(url, '_blank', 'noopener,noreferrer');
 }
 
 export function openDirections(latitude: number, longitude: number) {

@@ -1,9 +1,24 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useEffect, useState, type ComponentProps } from 'react';
-import { ActivityIndicator, Modal, Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { useEffect, useRef, useState, type ComponentProps } from 'react';
+import {
+  ActivityIndicator,
+  Animated,
+  Modal,
+  PanResponder,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+  type ViewStyle,
+} from 'react-native';
 
-import { AppText, Button } from '@/components/ui';
+import { ConfirmDialog } from '@/components/confirm-dialog';
+import { AppText, Button, Notice } from '@/components/ui';
+import { useAuth } from '@/features/auth/auth-provider';
 import { useMenuViewer, type MenuTarget } from '@/features/menu/menu-store';
+import { useDeleteRestaurant } from '@/features/restaurants/queries';
 import { useMenuPreview, type MenuPreview } from '@/features/menu/use-menu-preview';
 import { categoryMeta } from '@/lib/categories';
 import { openMenu } from '@/lib/links';
@@ -41,6 +56,36 @@ function MenuSheet({ target, onClose }: { target: MenuTarget; onClose: () => voi
   const { data: preview, isLoading } = useMenuPreview(target.url);
   const [loaded, setLoaded] = useState(false);
   const [slow, setSlow] = useState(false);
+  const { isAdmin } = useAuth();
+  const deleteRestaurant = useDeleteRestaurant();
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const canDelete = isAdmin && target.id != null;
+
+  // Arrastrar la cabecera hacia abajo cierra el menú. El contenido es una página de otro sitio dentro de un
+  // iframe: el navegador no informa su scroll ni sus toques, así que el gesto vive en la cabecera.
+  const [drag] = useState(() => new Animated.Value(0));
+  const closeRef = useRef(onClose);
+  useEffect(() => {
+    closeRef.current = onClose;
+  });
+  // Los handlers leen refs solo cuando ocurre el gesto (no durante el render).
+  // eslint-disable-next-line react-hooks/refs
+  const [pull] = useState(() =>
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_e, g) => g.dy > 6 && g.dy > Math.abs(g.dx),
+      onPanResponderMove: (_e, g) => drag.setValue(Math.max(0, g.dy)),
+      onPanResponderRelease: (_e, g) => {
+        if (g.dy > 110 || g.vy > 0.7) {
+          Animated.timing(drag, { toValue: 900, duration: 180, useNativeDriver: Platform.OS !== 'web' }).start(() =>
+            closeRef.current(),
+          );
+        } else {
+          Animated.spring(drag, { toValue: 0, useNativeDriver: Platform.OS !== 'web', bounciness: 4 }).start();
+        }
+      },
+      onPanResponderTerminate: () => Animated.spring(drag, { toValue: 0, useNativeDriver: Platform.OS !== 'web' }).start(),
+    }),
+  );
 
   // null = no hay verificador disponible: se intenta mostrar el link original.
   // En nativo el WebView no respeta X-Frame-Options: los sitios "blocked" también se ven adentro.
@@ -75,8 +120,11 @@ function MenuSheet({ target, onClose }: { target: MenuTarget; onClose: () => voi
   return (
     <View style={[styles.backdrop, wide && styles.backdropWide]}>
       <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Cerrar menú" />
-      <View style={[styles.sheet, wide ? styles.sheetWide : { marginTop: top }]}>
-        <View style={styles.header}>
+      <Animated.View style={[styles.sheet, wide ? styles.sheetWide : { marginTop: top, transform: [{ translateY: drag }] }]}>
+        <View
+          {...(wide ? {} : pull.panHandlers)}
+          style={[styles.header, Platform.OS === 'web' && !wide && ({ touchAction: 'none' } as unknown as ViewStyle)]}>
+          {!wide && <View style={styles.grab} pointerEvents="none" />}
           <View style={[styles.icon, { backgroundColor: meta.color }]}>
             <Ionicons name={meta.icon} size={20} color="#fff" />
           </View>
@@ -94,10 +142,28 @@ function MenuSheet({ target, onClose }: { target: MenuTarget; onClose: () => voi
           <Pressable onPress={() => openMenu(target.url)} hitSlop={8} style={styles.iconButton} accessibilityLabel="Abrir en el navegador">
             <Ionicons name="open-outline" size={20} color={colors.ink} />
           </Pressable>
+          {canDelete && (
+            <Pressable
+              onPress={() => {
+                deleteRestaurant.reset();
+                setConfirmDelete(true);
+              }}
+              hitSlop={8}
+              style={[styles.iconButton, { backgroundColor: colors.dangerSoft }]}
+              accessibilityLabel="Eliminar este menú de la base de datos">
+              <Ionicons name="trash-outline" size={20} color={colors.danger} />
+            </Pressable>
+          )}
           <Pressable onPress={onClose} hitSlop={8} style={styles.iconButton} accessibilityLabel="Cerrar">
             <Ionicons name="close" size={22} color={colors.ink} />
           </Pressable>
         </View>
+
+        {deleteRestaurant.error && !confirmDelete && (
+          <View style={{ padding: space.md }}>
+            <Notice tone="error">{deleteRestaurant.error.message}</Notice>
+          </View>
+        )}
 
         <View style={styles.body}>
           {showFrame && (
@@ -124,7 +190,27 @@ function MenuSheet({ target, onClose }: { target: MenuTarget; onClose: () => voi
             preview && <Fallback phase={phase} preview={preview} onOpen={() => openMenu(target.url)} onClose={onClose} />
           )}
         </View>
-      </View>
+      </Animated.View>
+
+      <ConfirmDialog
+        visible={confirmDelete}
+        icon="trash"
+        destructive
+        title="¿Eliminar este menú?"
+        message={`Se borra “${target.name}” de la base de datos junto con sus calificaciones, favoritos y reportes. No se puede deshacer.`}
+        confirmLabel="Eliminar"
+        loading={deleteRestaurant.isPending}
+        onCancel={() => setConfirmDelete(false)}
+        onConfirm={() =>
+          deleteRestaurant.mutate(target.id!, {
+            onSuccess: () => {
+              setConfirmDelete(false);
+              onClose();
+            },
+            onError: () => setConfirmDelete(false),
+          })
+        }
+      />
     </View>
   );
 }
@@ -253,6 +339,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.line,
   },
+  grab: { position: 'absolute', top: 5, alignSelf: 'center', left: '50%', marginLeft: -20, width: 40, height: 4, borderRadius: 2, backgroundColor: colors.line },
   icon: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   subRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   iconButton: {

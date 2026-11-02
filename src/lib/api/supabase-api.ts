@@ -95,6 +95,13 @@ export function createSupabaseApi(url: string, key: string): Api {
       if (error) fail(error);
     },
 
+    async deleteRestaurant(id) {
+      // La política de la base solo deja borrar lugares publicados a los admins; sin filas borradas, no hubo permiso.
+      const { data, error } = await supabase.from('restaurants').delete().eq('id', id).select('id');
+      if (error) fail(error);
+      if (!data?.length) throw new ApiError('No pudimos eliminar el menú. Revisá que seas administrador.');
+    },
+
     async review(id, decision, note) {
       const { error } = await supabase.rpc('review_restaurant', {
         p_id: id,

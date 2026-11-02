@@ -36,6 +36,11 @@ export function useWithdrawRestaurant() {
   return useMutation({ mutationFn: (id: number) => api.withdraw(id), onSuccess });
 }
 
+export function useDeleteRestaurant() {
+  const onSuccess = useInvalidateRestaurants();
+  return useMutation({ mutationFn: (id: number) => api.deleteRestaurant(id), onSuccess });
+}
+
 export function useRatingStats() {
   return useQuery({ queryKey: ['ratings', 'stats'], queryFn: api.ratingStats });
 }

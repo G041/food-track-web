@@ -70,6 +70,8 @@ export interface Api {
   listPending(): Promise<PendingRestaurant[]>;
   submit(input: NewRestaurant): Promise<Restaurant>;
   withdraw(id: number): Promise<void>;
+  /** Solo admin: borra un lugar de la base (también sus calificaciones, favoritos y reportes). */
+  deleteRestaurant(id: number): Promise<void>;
   review(id: number, decision: ReviewDecision, note?: string): Promise<void>;
 
   /** Promedio y cantidad de estrellas por restaurante (público). */

@@ -77,7 +77,7 @@ function ReviewCard({ restaurant: r }: { restaurant: PendingRestaurant }) {
       {r.address && <AppText variant="small">{r.address}</AppText>}
 
       <LinkCheck checking={checking} status={preview === null ? 'unknown' : preview?.status} httpStatus={preview?.httpStatus} />
-      <Pressable onPress={() => openMenu({ name: r.name, url: r.menu_url, category: r.category })} style={styles.link}>
+      <Pressable onPress={() => openMenu({ id: r.id, name: r.name, url: r.menu_url, category: r.category })} style={styles.link}>
         <Ionicons name="open-outline" size={16} color={colors.primaryDark} />
         <AppText variant="small" style={{ color: colors.primaryDark, flex: 1 }} numberOfLines={1}>
           {r.menu_url}

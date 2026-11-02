@@ -2,7 +2,8 @@ import { create } from 'zustand';
 
 import type { CategorySlug } from '@/lib/api';
 
-export type MenuTarget = { name: string; url: string; category: CategorySlug };
+/** id es el del lugar en la base; permite al admin eliminarlo desde el modal. */
+export type MenuTarget = { id?: number; name: string; url: string; category: CategorySlug };
 
 type MenuViewer = {
   target: MenuTarget | null;

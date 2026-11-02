@@ -5,6 +5,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, Image, PanResponder, Platform, StyleSheet, View, type ViewStyle } from 'react-native';
 
+import { setPageZoomEnabled } from '@/lib/page-zoom';
 import { isHttpUrl } from '@/lib/text';
 import { colors, radius, space } from '@/theme/tokens';
 
@@ -33,6 +34,11 @@ export function QrImageStep({ onUrl, onCancel }: { onUrl: (url: string) => void;
   const [frame, setFrame] = useState<Frame | null>(null);
   const [message, setMessage] = useState('');
   const [pickError, setPickError] = useState<string | null>(null);
+
+  // El zoom de página solo existe en el modal de menú; acá se asegura que esté bloqueado.
+  useEffect(() => {
+    setPageZoomEnabled(false);
+  }, []);
 
   async function pickImage() {
     setPickError(null);
@@ -202,10 +208,16 @@ function CropArea({
   const touch = Platform.OS === 'web' ? ({ touchAction: 'none', userSelect: 'none' } as unknown as ViewStyle) : null;
 
   return (
-    <View style={styles.cropBox} onLayout={(e) => setBoxWidth(e.nativeEvent.layout.width)}>
+    // Zoom bloqueado: el pellizco y el doble toque no agrandan la foto; solo se mueve el recuadro.
+    <View style={[styles.cropBox, touch]} onLayout={(e) => setBoxWidth(e.nativeEvent.layout.width)}>
       {display.w > 0 && (
-        <View style={{ width: display.w, height: display.h }}>
-          <Image source={{ uri: image.uri }} style={{ width: display.w, height: display.h }} resizeMode="stretch" />
+        <View style={[{ width: display.w, height: display.h }, touch]}>
+          <Image
+            source={{ uri: image.uri }}
+            style={[{ width: display.w, height: display.h }, touch as object | null]}
+            resizeMode="stretch"
+            pointerEvents="none"
+          />
           {frame && (
             <>
               {/* Velo oscuro alrededor del recuadro */}

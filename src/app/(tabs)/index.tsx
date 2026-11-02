@@ -1,10 +1,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { router } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Animated, Keyboard, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { ConfirmDialog } from '@/components/confirm-dialog';
-import { FadeIn, ScreenTransition, useMountTransition } from '@/components/motion';
+import { FadeIn, useMountTransition } from '@/components/motion';
 import { NearbySheet } from '@/components/nearby-sheet';
 import { RatingDialog } from '@/components/rating-dialog';
 import { ReportDialog } from '@/components/report-dialog';
@@ -54,7 +54,9 @@ export default function MapScreen() {
   const [searchFocused, setSearchFocused] = useState(false);
   const [catsOpen, setCatsOpen] = useState(false);
   const [catsMounted, catsAnim] = useMountTransition(catsOpen);
-  const { snap, setSnap } = useMapSheet();
+  const { snap, animated: sheetAnimated, presentation, reset: resetSheet, setSnap } = useMapSheet();
+  // Reset while leaving, so the next visit mounts a collapsed sheet.
+  useFocusEffect(useCallback(() => () => resetSheet(), [resetSheet]));
   const [onlyFavorites, setOnlyFavorites] = useState(false);
   const [detailsId, setDetailsId] = useState<number | null>(null);
   const [ratingFor, setRatingFor] = useState<Restaurant | null>(null);
@@ -129,8 +131,7 @@ export default function MapScreen() {
   }
 
   return (
-    // Entrada animada al volver a la pestaña Mapa, igual que el resto de las pantallas.
-    <ScreenTransition style={styles.container}>
+    <View style={styles.container}>
       <RestaurantMap
         markers={markers}
         selectedId={selectedId}
@@ -153,7 +154,9 @@ export default function MapScreen() {
 
       {/* Lugares cercanos (estilo Airbnb) */}
       <NearbySheet
+        key={presentation}
         snap={snap}
+        animated={sheetAnimated}
         onSnapChange={setSnap}
         fullTop={headerTop + SEARCH_HEIGHT + space.lg + (isDemo || activeCategory ? 30 : 0)}
         bottomInset={tabBarSpace}
@@ -386,7 +389,7 @@ export default function MapScreen() {
           router.navigate('/perfil');
         }}
       />
-    </ScreenTransition>
+    </View>
   );
 }
 

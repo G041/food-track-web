@@ -1,4 +1,4 @@
-import { Children, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Children, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   Animated,
   PanResponder,
@@ -10,8 +10,6 @@ import {
   type ScrollViewInstance,
   type ViewStyle,
 } from 'react-native';
-
-import { useIsFocused } from 'expo-router';
 
 import type { SheetSnap } from '@/features/map/sheet-store';
 import { colors, font, MAX_CONTENT_WIDTH, radius, shadow, space } from '@/theme/tokens';
@@ -32,6 +30,7 @@ const native = Platform.OS !== 'web';
  */
 export function NearbySheet({
   snap,
+  animated = true,
   onSnapChange,
   fullTop,
   bottomInset,
@@ -45,6 +44,7 @@ export function NearbySheet({
   children,
 }: {
   snap: SheetSnap;
+  animated?: boolean;
   onSnapChange: (snap: SheetSnap) => void;
   /** Hasta dónde sube el panel abierto por completo (debajo del buscador). */
   fullTop: number;
@@ -164,19 +164,20 @@ export function NearbySheet({
     return () => y.removeListener(id);
   }, [y]);
 
-  // Con la pantalla del mapa oculta (p. ej. al tocar "Mapa" desde otra pestaña), el panel se ubica
-  // sin animar: si no, se lo vería bajar un instante al volver.
-  const focused = useIsFocused();
-  useEffect(() => {
-    if (!focused) {
-      y.stopAnimation();
+  const previousSnap = useRef(snap);
+  useLayoutEffect(() => {
+    // Layout measurements and tab returns settle before paint. Only deliberate
+    // snap changes animate; correcting the container height must never slide in.
+    const shouldAnimate = animated && previousSnap.current !== snap;
+    previousSnap.current = snap;
+    y.stopAnimation();
+    if (shouldAnimate) {
+      Animated.spring(y, { toValue: positions[snap], useNativeDriver: native, bounciness: 2, speed: 14 }).start();
+    } else {
       y.setValue(positions[snap]);
-      return;
+      current.current = positions[snap];
     }
-    Animated.spring(y, { toValue: positions[snap], useNativeDriver: native, bounciness: 2, speed: 14 }).start();
-    // focused no está en las dependencias a propósito: volver a la pestaña no debe re-animar.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [snap, positions, y]);
+  }, [snap, positions, animated, y]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ y: 0, animated: false });
@@ -232,8 +233,20 @@ export function NearbySheet({
     <>
       <Animated.View
         pointerEvents="box-none"
-        onLayout={(event) => setMeasuredHeight(event.nativeEvent.layout.height)}
-        style={[styles.sheet, { top: fullTop, bottom: 0, transform: [{ translateY: y }] }]}>
+        onLayout={(event) => {
+          const height = event.nativeEvent.layout.height;
+          // Hidden web tabs report zero height; wait for a visible layout.
+          if (height > 0) setMeasuredHeight(height);
+        }}
+        style={[
+          styles.sheet,
+          { top: fullTop, bottom: 0, transform: [{ translateY: y }] },
+          // Percentage positioning uses the real container height immediately,
+          // before onLayout runs. Keep the collapsed handle visible from frame one.
+          measuredHeight === null && snap === 'collapsed' && {
+            transform: [{ translateY: '100%' }, { translateY: -(bottomInset + COLLAPSED_NAV_GAP + HANDLE_AREA) }],
+          },
+        ]}>
         {floatingOverMap && (
           <Animated.View pointerEvents={snap === 'full' ? 'none' : 'box-none'} style={[styles.floating, { opacity: floatingOpacity }]}>
             {floatingOverMap}

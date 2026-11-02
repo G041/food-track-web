@@ -4,12 +4,17 @@ export type SheetSnap = 'collapsed' | 'half' | 'full';
 
 type MapSheet = {
   snap: SheetSnap;
-  setSnap: (snap: SheetSnap) => void;
+  animated: boolean;
+  presentation: number;
+  reset: () => void;
+  setSnap: (snap: SheetSnap, animated?: boolean) => void;
 };
 
 // Shared with the navbar so pressing Mapa also collapses an already active map.
-// Arranca escondido: el panel solo se abre cuando el usuario lo arrastra hacia arriba.
 export const useMapSheet = create<MapSheet>((set) => ({
   snap: 'collapsed',
-  setSnap: (snap) => set({ snap }),
+  animated: false,
+  presentation: 0,
+  reset: () => set(state => ({ snap: 'collapsed', animated: false, presentation: state.presentation + 1 })),
+  setSnap: (snap, animated = true) => set({ snap, animated }),
 }));

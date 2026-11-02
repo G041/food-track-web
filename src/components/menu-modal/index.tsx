@@ -41,10 +41,10 @@ const WIDE_MIN_SIDE = 500;
 /** Modal global con la vista previa del menú. Se abre con useMenuViewer().open(...). */
 export default function MenuModal() {
   const { target, close } = useMenuViewer();
-  // El zoom de página y girar el teléfono solo se permiten mientras se lee un menú;
-  // el resto de la app queda en vertical.
+  // El visor web amplía solo el menú; la página permanece fija.
+  // Girar el teléfono solo se permite mientras se lee un menú.
   useEffect(() => {
-    setPageZoomEnabled(!!target);
+    setPageZoomEnabled(false);
     if (target) allowRotation();
     else lockPortrait();
   }, [target]);

@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect } from 'react';
 import { Platform, useColorScheme } from 'react-native';
 import { create } from 'zustand';
@@ -20,15 +21,27 @@ function readPreference(): ThemePreference {
 
 type ThemeState = { preference: ThemePreference; setPreference: (p: ThemePreference) => void };
 
+const isPreference = (v: unknown): v is ThemePreference => v === 'light' || v === 'dark' || v === 'system';
+
 export const useThemePreference = create<ThemeState>((set) => ({
   preference: readPreference(),
   setPreference: (preference) => {
     try {
       globalThis.localStorage?.setItem(STORAGE_KEY, preference);
     } catch {}
+    if (Platform.OS !== 'web') AsyncStorage.setItem(STORAGE_KEY, preference).catch(() => {});
     set({ preference });
   },
 }));
+
+// En nativo no hay localStorage: la preferencia vive en AsyncStorage y se carga al arrancar.
+if (Platform.OS !== 'web') {
+  AsyncStorage.getItem(STORAGE_KEY)
+    .then((v) => {
+      if (isPreference(v)) useThemePreference.setState({ preference: v });
+    })
+    .catch(() => {});
+}
 
 export function useResolvedTheme(): ResolvedTheme {
   const preference = useThemePreference((s) => s.preference);

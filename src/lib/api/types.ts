@@ -29,7 +29,8 @@ export type NewRestaurant = RestaurantSeed;
 export type Profile = {
   id: string;
   username: string;
-  role: 'user' | 'admin';
+  /** banned: puede ver el mapa, pero no aportar, calificar ni reportar. */
+  role: 'user' | 'admin' | 'banned';
   points: number;
 };
 
@@ -46,6 +47,21 @@ export type AdminNote = {
   done: boolean;
   created_at: string;
   author: string | null;
+};
+
+export type ReportReason = 'menu_roto' | 'cerrado' | 'datos_incorrectos' | 'inapropiado' | 'otro';
+
+/** Reporte abierto, como lo ve el admin. */
+export type OpenReport = {
+  id: number;
+  reason: ReportReason;
+  detail: string | null;
+  created_at: string;
+  reporter: string | null;
+  restaurant: Pick<Restaurant, 'id' | 'name' | 'menu_url' | 'category' | 'submitted_by'> & {
+    submitter: string | null;
+    submitterBanned: boolean;
+  };
 };
 
 export interface Api {
@@ -70,6 +86,11 @@ export interface Api {
   setNoteDone(id: number, done: boolean): Promise<void>;
   deleteNote(id: number): Promise<void>;
 
+  report(restaurantId: number, reason: ReportReason, detail?: string): Promise<void>;
+  listReports(): Promise<OpenReport[]>;
+  resolveReport(id: number): Promise<void>;
+  setUserBanned(userId: string, banned: boolean): Promise<void>;
+
   getSession(): Promise<Session | null>;
   onSessionChange(cb: (session: Session | null) => void): () => void;
   getProfile(userId: string): Promise<Profile | null>;
@@ -78,6 +99,12 @@ export interface Api {
   /** Devuelve true si el usuario tiene que confirmar su email antes de entrar. */
   signUp(email: string, username: string, password: string): Promise<{ needsConfirmation: boolean }>;
   signOut(): Promise<void>;
+  /** Manda el email con el link para elegir una contraseña nueva. */
+  requestPasswordReset(email: string): Promise<void>;
+  /** Cambia la contraseña del usuario logueado (también tras abrir el link de recuperación). */
+  updatePassword(password: string): Promise<void>;
+  /** Borra la cuenta y sus datos personales. Sus lugares publicados quedan sin autor. */
+  deleteAccount(): Promise<void>;
 }
 
 /** Error con mensaje listo para mostrar al usuario. */

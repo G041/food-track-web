@@ -1,23 +1,26 @@
-import { StyleSheet, View } from 'react-native';
-
-import { AppText, Button } from '@/components/ui';
-import { openMenu } from '@/lib/links';
-import { colors, space } from '@/theme/tokens';
+import { Linking } from 'react-native';
+import { WebView } from 'react-native-webview';
 
 import type { MenuFrameProps } from './types';
 
-// Nativo (fase 5): react-native-webview, que no tiene la restricción de iframes de la web.
-export default function MenuFrame({ src }: MenuFrameProps) {
+// Nativo: WebView no tiene la restricción de iframes de la web (X-Frame-Options), así que
+// también se ven adentro los menús que en web solo se abren afuera.
+export default function MenuFrame({ src, onLoad }: MenuFrameProps) {
   return (
-    <View style={styles.container}>
-      <AppText variant="small" style={{ textAlign: 'center' }}>
-        La vista previa dentro de la app llega con la versión nativa.
-      </AppText>
-      <Button title="Abrir menú" icon="open-outline" onPress={() => openMenu(src)} />
-    </View>
+    <WebView
+      key={src}
+      source={{ uri: src }}
+      onLoadEnd={onLoad}
+      // Los links target="_blank" se abren en el mismo WebView en vez de quedar muertos.
+      setSupportMultipleWindows={false}
+      // Equivalente al sandbox de la web: el sitio no abre otras apps (tel:, intent:, etc.) sin pasar por el sistema.
+      onShouldStartLoadWithRequest={(req) => {
+        if (/^(https?|about|blob|data):/i.test(req.url)) return true;
+        Linking.openURL(req.url).catch(() => {});
+        return false;
+      }}
+      allowsInlineMediaPlayback
+      style={{ flex: 1, backgroundColor: '#fff' }}
+    />
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: space.md, backgroundColor: colors.surface },
-});

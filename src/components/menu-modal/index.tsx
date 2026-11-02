@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useState, type ComponentProps } from 'react';
-import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Modal, Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import { AppText, Button } from '@/components/ui';
 import { useMenuViewer, type MenuTarget } from '@/features/menu/menu-store';
@@ -43,7 +43,13 @@ function MenuSheet({ target, onClose }: { target: MenuTarget; onClose: () => voi
   const [slow, setSlow] = useState(false);
 
   // null = no hay verificador disponible: se intenta mostrar el link original.
-  const showFrame = !isLoading && (!preview || preview.status === 'embeddable' || preview.status === 'unverified');
+  // En nativo el WebView no respeta X-Frame-Options: los sitios "blocked" también se ven adentro.
+  const showFrame =
+    !isLoading &&
+    (!preview ||
+      preview.status === 'embeddable' ||
+      preview.status === 'unverified' ||
+      (Platform.OS !== 'web' && preview.status === 'blocked'));
   const verified = preview?.status === 'embeddable';
 
   useEffect(() => {
@@ -214,10 +220,13 @@ function safeHost(url: string) {
   }
 }
 
-/** URL final del iframe. Los PDF en pantallas chicas van por el visor de Google (los navegadores móviles no los muestran embebidos). */
+/**
+ * URL final del iframe/WebView. Los PDF en pantallas chicas van por el visor de Google (los navegadores
+ * móviles y el WebView de Android no los muestran embebidos); el WebView de iOS sí los abre directo.
+ */
 function frameSrc(original: string, preview: MenuPreview | null | undefined, wide: boolean) {
   const url = preview?.embedUrl ?? original;
-  if (preview?.kind === 'pdf' && !wide) {
+  if (preview?.kind === 'pdf' && !wide && Platform.OS !== 'ios') {
     return `https://docs.google.com/viewer?embedded=true&url=${encodeURIComponent(url)}`;
   }
   return url;

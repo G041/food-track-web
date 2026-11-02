@@ -132,5 +132,44 @@ ok((await as(bob, () => q(`select count(*)::int n from favorites`)))[0].n === 0,
 ok(!!(await err(() => as(bob, () => q(`insert into favorites (user_id, restaurant_id) values ($1, 3)`, [alice])))), 'no se agregan favoritos a otro usuario');
 ok((await as(alice, () => q(`delete from favorites where restaurant_id = 1 returning *`))).length === 1, 'usuario quita un favorito');
 
+// ── Reportes ──
+const report = (uid, id, reason = 'menu_roto') =>
+  as(uid, () => q(`insert into reports (restaurant_id, reason, detail) values ($1, $2, 'detalle') returning *`, [id, reason]));
+ok(!!(await err(() => as(null, () => q(`insert into reports (restaurant_id, reason) values (1, 'otro')`)))), 'anónimo no puede reportar');
+const [rep] = await report(bob, 1);
+ok(rep.reported_by === bob && rep.status === 'open', 'usuario reporta un lugar publicado a su nombre');
+ok((await err(() => report(bob, 1)))?.code === '23505', 'no se repite un reporte abierto del mismo usuario');
+ok(!!(await err(() => report(bob, pendingR.id))), 'no se reporta un lugar sin publicar');
+ok(!!(await err(() => report(bob, 2, 'cualquiera'))), 'motivo inválido se rechaza');
+ok(!!(await err(() => as(bob, () => q(`insert into reports (restaurant_id, reason, reported_by) values (2, 'otro', $1)`, [alice])))), 'no se reporta a nombre de otro');
+ok((await as(alice, () => q(`select count(*)::int n from reports`)))[0].n === 0, 'los reportes ajenos no se ven');
+ok((await as(bob, () => q(`update reports set status = 'resolved' where id = $1 returning id`, [rep.id]))).length === 0, 'usuario común no resuelve reportes');
+ok((await as(admin, () => q(`select count(*)::int n from reports where status = 'open'`)))[0].n === 1, 'admin ve los reportes abiertos');
+await as(admin, () => q(`update reports set status = 'resolved', resolved_by = $1, resolved_at = now() where id = $2`, [admin, rep.id]));
+ok((await q(`select status from reports where id = $1`, [rep.id]))[0].status === 'resolved', 'admin resuelve un reporte');
+ok((await report(bob, 1)).length === 1, 'con el reporte resuelto se puede volver a reportar');
+
+// ── Bloqueo de usuarios ──
+ok(!!(await err(() => as(alice, () => q(`select set_user_banned($1, true)`, [bob])))), 'usuario común no puede bloquear');
+ok(!!(await err(() => as(admin, () => q(`select set_user_banned($1, true)`, [admin])))), 'no se puede bloquear a un admin');
+await as(admin, () => q(`select set_user_banned($1, true)`, [bob]));
+ok((await q(`select role from profiles where id = $1`, [bob]))[0].role === 'banned', 'admin bloquea a un usuario');
+const banned = await err(() => ins(bob, 'https://bloqueado.com/menu'));
+ok(/bloqueada/.test(banned?.message ?? ''), `usuario bloqueado no puede aportar (${banned?.message})`);
+ok(!!(await err(() => rate(bob, 2, 4))), 'usuario bloqueado no puede calificar');
+ok(!!(await err(() => report(bob, 2))), 'usuario bloqueado no puede reportar');
+ok((await as(bob, () => q(`select count(*)::int n from restaurants where status = 'approved'`)))[0].n > 0, 'usuario bloqueado sigue viendo el mapa');
+ok((await as(bob, () => q(`update profiles set role = 'user' where id = $1 returning id`, [bob]))).length === 0, 'usuario bloqueado no se desbloquea solo');
+await as(admin, () => q(`select set_user_banned($1, false)`, [bob]));
+ok((await q(`select role from profiles where id = $1`, [bob]))[0].role === 'user', 'admin desbloquea a un usuario');
+
+// ── Borrar cuenta (lo que hace api/delete-account con la clave secreta) ──
+await q(`delete from restaurants where submitted_by = $1 and status <> 'approved'`, [alice]);
+await q(`delete from auth.users where id = $1`, [alice]);
+ok((await q(`select count(*)::int n from profiles where id = $1`, [alice]))[0].n === 0, 'borrar el usuario borra su perfil');
+ok((await q(`select count(*)::int n from ratings where user_id = $1`, [alice]))[0].n === 0, 'borrar el usuario borra sus calificaciones');
+ok((await q(`select submitted_by from restaurants where id = $1`, [r1.id]))[0].submitted_by === null, 'sus lugares publicados quedan sin autor');
+ok((await q(`select count(*)::int n from restaurants where id = $1`, [pendingR.id]))[0].n === 0, 'sus aportes pendientes se borran');
+
 console.log(fails ? `\n${fails} FALLAS` : '\nTODO OK');
 process.exit(fails ? 1 : 0);

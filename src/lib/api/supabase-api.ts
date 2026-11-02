@@ -1,10 +1,20 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient, type PostgrestError } from '@supabase/supabase-js';
-import { Platform } from 'react-native';
+import { AppState, Platform } from 'react-native';
 
-import { ApiError, type AdminNote, type Api, type PendingRestaurant, type RatingStats, type Restaurant } from './types';
+import {
+  ApiError,
+  type AdminNote,
+  type Api,
+  type OpenReport,
+  type PendingRestaurant,
+  type RatingStats,
+  type Restaurant,
+} from './types';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? '';
+// Adonde llevan los links de los emails (recuperar contraseña): siempre la web, también desde la app nativa.
+const SITE_URL = Platform.OS === 'web' && typeof location !== 'undefined' ? location.origin : API_URL;
 
 export function createSupabaseApi(url: string, key: string): Api {
   const supabase = createClient(url, key, {
@@ -16,6 +26,14 @@ export function createSupabaseApi(url: string, key: string): Api {
       detectSessionInUrl: Platform.OS === 'web',
     },
   });
+
+  // En nativo el token se refresca solo con la app en primer plano (patrón oficial de Supabase + Expo).
+  if (Platform.OS !== 'web') {
+    AppState.addEventListener('change', (state) => {
+      if (state === 'active') supabase.auth.startAutoRefresh();
+      else supabase.auth.stopAutoRefresh();
+    });
+  }
 
   function fail(error: PostgrestError | { message: string; code?: string }): never {
     if (error.code === '23505') throw new ApiError('Ese menú ya fue cargado por alguien más.');
@@ -150,6 +168,55 @@ export function createSupabaseApi(url: string, key: string): Api {
       if (error) fail(error);
     },
 
+    async report(restaurantId, reason, detail) {
+      const { error } = await supabase
+        .from('reports')
+        .insert({ restaurant_id: restaurantId, reason, detail: detail?.trim() || null });
+      if (error?.code === '23505') throw new ApiError('Ya reportaste este lugar. Lo estamos revisando.');
+      if (error) fail(error);
+    },
+
+    async listReports() {
+      const { data, error } = await supabase
+        .from('reports')
+        .select(
+          'id, reason, detail, created_at, reporter:profiles!reports_reported_by_fkey(username), ' +
+            'restaurant:restaurants(id, name, menu_url, category, submitted_by, submitter:profiles!restaurants_submitted_by_fkey(username, role))',
+        )
+        .eq('status', 'open')
+        .order('created_at');
+      if (error) fail(error);
+      type Row = {
+        id: number;
+        reason: OpenReport['reason'];
+        detail: string | null;
+        created_at: string;
+        reporter: { username: string } | null;
+        restaurant: Omit<OpenReport['restaurant'], 'submitter' | 'submitterBanned'> & {
+          submitter: { username: string; role: string } | null;
+        };
+      };
+      return ((data ?? []) as unknown as Row[]).map(({ reporter, restaurant: { submitter, ...restaurant }, ...r }) => ({
+        ...r,
+        reporter: reporter?.username ?? null,
+        restaurant: { ...restaurant, submitter: submitter?.username ?? null, submitterBanned: submitter?.role === 'banned' },
+      }));
+    },
+
+    async resolveReport(id) {
+      const { data } = await supabase.auth.getSession();
+      const { error } = await supabase
+        .from('reports')
+        .update({ status: 'resolved', resolved_by: data.session?.user.id, resolved_at: new Date().toISOString() })
+        .eq('id', id);
+      if (error) fail(error);
+    },
+
+    async setUserBanned(userId, banned) {
+      const { error } = await supabase.rpc('set_user_banned', { p_user: userId, p_banned: banned });
+      if (error) fail(error);
+    },
+
     async getSession() {
       const { data } = await supabase.auth.getSession();
       const user = data.session?.user;
@@ -221,6 +288,41 @@ export function createSupabaseApi(url: string, key: string): Api {
 
     async signOut() {
       await supabase.auth.signOut();
+    },
+
+    async requestPasswordReset(email) {
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: `${SITE_URL}/nueva-clave` });
+      if (error && /rate limit/i.test(error.message)) throw new ApiError('Demasiados intentos. Esperá unos minutos.');
+      if (error) authFail(error.message);
+    },
+
+    async updatePassword(password) {
+      const { error } = await supabase.auth.updateUser({ password });
+      if (error && /different from the old/i.test(error.message)) {
+        throw new ApiError('La contraseña nueva tiene que ser distinta de la anterior.');
+      }
+      if (error) authFail(error.message);
+    },
+
+    async deleteAccount() {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      if (!token) throw new ApiError('Ingresá de nuevo para borrar tu cuenta.');
+      let res: Response;
+      try {
+        res = await fetch(`${API_URL}/api/delete-account`, {
+          method: 'POST',
+          headers: { authorization: `Bearer ${token}` },
+        });
+      } catch {
+        throw new ApiError('No pudimos conectar. Probá de nuevo.');
+      }
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new ApiError(body?.error ?? 'No pudimos borrar la cuenta. Probá de nuevo.');
+      }
+      // El usuario ya no existe en el servidor: solo queda limpiar la sesión guardada.
+      await supabase.auth.signOut({ scope: 'local' });
     },
   };
 }

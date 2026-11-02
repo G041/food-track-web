@@ -7,6 +7,7 @@ import { ConfirmDialog } from '@/components/confirm-dialog';
 import { FadeIn, useMountTransition } from '@/components/motion';
 import { NearbySheet } from '@/components/nearby-sheet';
 import { RatingDialog } from '@/components/rating-dialog';
+import { ReportDialog } from '@/components/report-dialog';
 import { RestaurantCard } from '@/components/restaurant-card';
 import { RestaurantDetailsModal } from '@/components/restaurant-details-modal';
 import RestaurantMap, { type MapMarker } from '@/components/restaurant-map';
@@ -57,6 +58,7 @@ export default function MapScreen() {
   const [onlyFavorites, setOnlyFavorites] = useState(false);
   const [detailsId, setDetailsId] = useState<number | null>(null);
   const [ratingFor, setRatingFor] = useState<Restaurant | null>(null);
+  const [reportFor, setReportFor] = useState<Restaurant | null>(null);
   const [askLogin, setAskLogin] = useState(false);
   const activeCategory = category ? categoryMeta(category) : null;
   const favorites = useMemo(() => new Set(favoriteIds), [favoriteIds]);
@@ -207,6 +209,7 @@ export default function MapScreen() {
               onOpenMenu={() => openMenu({ name: r.name, url: r.menu_url, category: r.category })}
               onRate={() => setRatingFor(r)}
               onDirections={() => openDirections(r.latitude, r.longitude)}
+              onReport={() => setReportFor(r)}
             />
           ))
         )}
@@ -355,6 +358,10 @@ export default function MapScreen() {
             setDetailsId(null);
             setRatingFor(detailsRestaurant);
           }}
+          onReport={() => {
+            setDetailsId(null);
+            setReportFor(detailsRestaurant);
+          }}
           onDirections={() => openDirections(detailsRestaurant.latitude, detailsRestaurant.longitude)}
         />
       )}
@@ -365,6 +372,7 @@ export default function MapScreen() {
         current={ratingFor ? myRatings[ratingFor.id] : undefined}
         onClose={() => setRatingFor(null)}
       />
+      <ReportDialog restaurant={reportFor} onClose={() => setReportFor(null)} />
       <ConfirmDialog
         visible={askLogin}
         icon="heart-outline"

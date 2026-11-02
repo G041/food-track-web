@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { api, type NewRestaurant, type ReviewDecision } from '@/lib/api';
+import { api, type NewRestaurant, type ReportReason, type ReviewDecision } from '@/lib/api';
 
 export function useApprovedRestaurants() {
   return useQuery({ queryKey: ['restaurants', 'approved'], queryFn: api.listApproved });
@@ -95,5 +95,31 @@ export function useReviewRestaurant() {
     mutationFn: (v: { id: number; decision: ReviewDecision; note?: string }) =>
       api.review(v.id, v.decision, v.note),
     onSuccess,
+  });
+}
+
+export function useReportRestaurant() {
+  return useMutation({
+    mutationFn: (v: { id: number; reason: ReportReason; detail?: string }) => api.report(v.id, v.reason, v.detail),
+  });
+}
+
+export function useReports(enabled: boolean) {
+  return useQuery({ queryKey: ['reports'], queryFn: api.listReports, enabled });
+}
+
+export function useResolveReport() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => api.resolveReport(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['reports'] }),
+  });
+}
+
+export function useSetUserBanned() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { userId: string; banned: boolean }) => api.setUserBanned(v.userId, v.banned),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['reports'] }),
   });
 }

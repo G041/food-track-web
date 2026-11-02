@@ -3,6 +3,7 @@ import { router, useIsFocused } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import { QrImageStep } from '@/components/qr-image-step';
 import { QrScanner } from '@/components/qr-scanner';
 import RestaurantMap from '@/components/restaurant-map';
 import { AppText, Button, Card, Chip, Notice, Screen, TextField } from '@/components/ui';
@@ -14,7 +15,7 @@ import { CATEGORIES } from '@/lib/categories';
 import { isHttpUrl } from '@/lib/text';
 import { colors, radius, space } from '@/theme/tokens';
 
-type Step = 'source' | 'scan' | 'link' | 'form' | 'done';
+type Step = 'source' | 'scan' | 'gallery' | 'link' | 'form' | 'done';
 
 const EMPTY: RestaurantDraft = {
   menu_url: '',
@@ -66,6 +67,12 @@ export default function AportarScreen() {
             onPress={() => setStep('scan')}
           />
           <OptionCard
+            icon="images"
+            title="Subir una foto del QR"
+            text="Elegí una captura o foto de tu galería."
+            onPress={() => setStep('gallery')}
+          />
+          <OptionCard
             icon="link"
             title="Pegar el link del menú"
             text="Si ya tenés la URL del menú digital."
@@ -76,6 +83,8 @@ export default function AportarScreen() {
       )}
 
       {step === 'scan' && isFocused && <ScanStep onUrl={startForm} onCancel={() => setStep('source')} />}
+
+      {step === 'gallery' && <QrImageStep onUrl={startForm} onCancel={() => setStep('source')} />}
 
       {step === 'link' && <LinkStep onUrl={startForm} onCancel={() => setStep('source')} />}
 
@@ -125,7 +134,7 @@ function HowItWorks() {
     <Card style={{ backgroundColor: colors.surfaceAlt }}>
       <AppText variant="label">¿Cómo funciona?</AppText>
       {[
-        ['qr-code-outline', 'Escaneás el QR o pegás el link del menú.'],
+        ['qr-code-outline', 'Escaneás el QR, subís una foto de él o pegás el link del menú.'],
         ['create-outline', 'Completás nombre, categoría y ubicación.'],
         ['shield-checkmark-outline', 'Un moderador revisa el aporte antes de publicarlo.'],
         ['trophy-outline', 'Si se aprueba, aparece en el mapa y sumás puntos.'],
@@ -147,7 +156,7 @@ function OptionCard({
   text,
   onPress,
 }: {
-  icon: 'qr-code' | 'link';
+  icon: 'qr-code' | 'link' | 'images';
   title: string;
   text: string;
   onPress: () => void;

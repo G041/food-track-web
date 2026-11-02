@@ -34,6 +34,7 @@ export function RestaurantCard({
   onOpenMenu,
   onRate,
   onDirections,
+  onReport,
 }: {
   restaurant: Restaurant;
   distance: number | null;
@@ -48,6 +49,7 @@ export function RestaurantCard({
   onOpenMenu: () => void;
   onRate: () => void;
   onDirections: () => void;
+  onReport: () => void;
 }) {
   const meta = categoryMeta(r.category);
   const rating = formatRating(stats);
@@ -159,6 +161,9 @@ export function RestaurantCard({
           />
           <Pressable onPress={onDirections} style={styles.iconButton} accessibilityRole="button" accessibilityLabel="Cómo llegar">
             <Ionicons name="navigate-outline" size={20} color={colors.ink} style={styles.directionsIcon} />
+          </Pressable>
+          <Pressable onPress={onReport} style={styles.iconButton} accessibilityRole="button" accessibilityLabel={`Reportar ${r.name}`}>
+            <Ionicons name="flag-outline" size={18} color={colors.inkSoft} />
           </Pressable>
         </View>
       </View>

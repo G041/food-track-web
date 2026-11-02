@@ -1,6 +1,14 @@
 // Backend simulado para probar la app sin Supabase. Guarda todo en localStorage (web).
 import { seedRestaurants } from './seed-data';
-import { ApiError, type AdminNote, type Api, type Profile, type Restaurant, type Session } from './types';
+import {
+  ApiError,
+  type AdminNote,
+  type Api,
+  type Profile,
+  type ReportReason,
+  type Restaurant,
+  type Session,
+} from './types';
 
 type DemoUser = Profile & { email: string; password: string };
 type DemoState = {
@@ -12,6 +20,7 @@ type DemoState = {
   /** userId → restaurantId → estrellas */
   ratings?: Record<string, Record<number, number>>;
   favorites?: Record<string, number[]>;
+  reports?: { id: number; restaurant_id: number; reported_by: string; reason: ReportReason; detail: string | null; status: 'open' | 'resolved'; created_at: string }[];
 };
 
 const STORAGE_KEY = 'foodtrack-demo-v1';
@@ -86,6 +95,7 @@ export function createDemoApi(): Api {
       await delay();
       const user = me();
       if (!user) throw new ApiError('Tenés que ingresar para aportar.');
+      if (user.role === 'banned') throw new ApiError('Tu cuenta está bloqueada por incumplir los términos de uso');
       const url = input.menu_url.toLowerCase();
       if (state.restaurants.some((r) => r.status !== 'rejected' && r.menu_url.toLowerCase() === url)) {
         throw new ApiError('Ese menú ya fue cargado por alguien más.');
@@ -200,6 +210,76 @@ export function createDemoApi(): Api {
       save();
     },
 
+    async report(restaurantId, reason, detail) {
+      await delay();
+      const user = me();
+      if (!user) throw new ApiError('Ingresá para reportar un lugar.');
+      if (user.role === 'banned') throw new ApiError('Tu cuenta está bloqueada por incumplir los términos de uso');
+      const reports = state.reports ?? [];
+      if (reports.some((r) => r.restaurant_id === restaurantId && r.reported_by === user.id && r.status === 'open')) {
+        throw new ApiError('Ya reportaste este lugar. Lo estamos revisando.');
+      }
+      state.reports = [
+        ...reports,
+        {
+          id: Date.now(),
+          restaurant_id: restaurantId,
+          reported_by: user.id,
+          reason,
+          detail: detail?.trim() || null,
+          status: 'open',
+          created_at: new Date().toISOString(),
+        },
+      ];
+      save();
+    },
+
+    async listReports() {
+      await delay();
+      if (me()?.role !== 'admin') return [];
+      const username = (id: string | null) => state.users.find((u) => u.id === id)?.username ?? null;
+      return (state.reports ?? [])
+        .filter((r) => r.status === 'open')
+        .flatMap((r) => {
+          const x = state.restaurants.find((rr) => rr.id === r.restaurant_id);
+          if (!x) return [];
+          const submitter = state.users.find((u) => u.id === x.submitted_by);
+          return [
+            {
+              id: r.id,
+              reason: r.reason,
+              detail: r.detail,
+              created_at: r.created_at,
+              reporter: username(r.reported_by),
+              restaurant: {
+                id: x.id,
+                name: x.name,
+                menu_url: x.menu_url,
+                category: x.category,
+                submitted_by: x.submitted_by,
+                submitter: submitter?.username ?? null,
+                submitterBanned: submitter?.role === 'banned',
+              },
+            },
+          ];
+        });
+    },
+
+    async resolveReport(id) {
+      await delay();
+      state.reports = (state.reports ?? []).map((r) => (r.id === id ? { ...r, status: 'resolved' as const } : r));
+      save();
+    },
+
+    async setUserBanned(userId, banned) {
+      await delay();
+      if (me()?.role !== 'admin') throw new ApiError('Solo un administrador puede bloquear usuarios');
+      const u = state.users.find((x) => x.id === userId);
+      if (!u || u.role === 'admin') throw new ApiError('No se puede bloquear a ese usuario');
+      u.role = banned ? 'banned' : 'user';
+      save();
+    },
+
     async getSession() {
       return state.session;
     },
@@ -237,6 +317,33 @@ export function createDemoApi(): Api {
     },
 
     async signOut() {
+      setSession(null);
+    },
+
+    async requestPasswordReset() {
+      await delay();
+      throw new ApiError('En el modo demo no se mandan emails.');
+    },
+
+    async updatePassword(password) {
+      await delay();
+      const user = me();
+      if (!user) throw new ApiError('El link venció. Pedí uno nuevo.');
+      if (password.length < 6) throw new ApiError('La contraseña debe tener al menos 6 caracteres.');
+      user.password = password;
+      save();
+    },
+
+    async deleteAccount() {
+      await delay();
+      const uid = state.session?.userId;
+      if (!uid) throw new ApiError('Ingresá de nuevo para borrar tu cuenta.');
+      state.users = state.users.filter((u) => u.id !== uid);
+      state.restaurants = state.restaurants
+        .filter((r) => !(r.submitted_by === uid && r.status !== 'approved'))
+        .map((r) => (r.submitted_by === uid ? { ...r, submitted_by: null } : r));
+      if (state.ratings) delete state.ratings[uid];
+      if (state.favorites) delete state.favorites[uid];
       setSession(null);
     },
   };

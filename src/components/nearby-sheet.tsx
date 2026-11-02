@@ -93,6 +93,64 @@ export function NearbySheet({
     latest.current = { positions, snap, onSnapChange };
   });
   const scrollRef = useRef<ScrollViewInstance>(null);
+  // Gesto de cierre desde la lista: con la lista en el primer elemento, seguir tirando hacia abajo
+  // arrastra el panel y, al soltar, lo baja a la posición siguiente.
+  const scrollOffset = useRef(0);
+  const listDrag = useRef({ startY: 0, startX: 0, lastY: 0, lastT: 0, vy: 0, active: false });
+
+  function settleFromList(dy: number) {
+    const { positions, snap, onSnapChange } = latest.current;
+    const idx = ORDER.indexOf(snap);
+    const travelled = start.current + dy - positions[snap];
+    const lower = ORDER[Math.max(0, idx - 1)];
+    const distance = Math.max(1, positions[lower] - positions[snap]);
+    // Un tirón rápido o recorrer ~25% del tramo baja una posición; si no, vuelve a su lugar.
+    if (lower !== snap && (listDrag.current.vy > 0.5 || travelled > distance * 0.25)) onSnapChange(lower);
+    else Animated.spring(y, { toValue: positions[snap], useNativeDriver: native, bounciness: 2 }).start();
+  }
+
+  const listTouch = {
+    onTouchStart: (e: { nativeEvent: { pageX: number; pageY: number; timestamp?: number } }) => {
+      const d = listDrag.current;
+      d.startY = d.lastY = e.nativeEvent.pageY;
+      d.startX = e.nativeEvent.pageX;
+      d.lastT = e.nativeEvent.timestamp ?? Date.now();
+      d.vy = 0;
+      d.active = false;
+    },
+    onTouchMove: (e: { nativeEvent: { pageX: number; pageY: number; timestamp?: number } }) => {
+      const d = listDrag.current;
+      const { snap, positions } = latest.current;
+      if (snap === 'collapsed') return;
+      const pageY = e.nativeEvent.pageY;
+      const dy = pageY - d.startY;
+      if (!d.active) {
+        const downward = dy > 8 && dy > Math.abs(e.nativeEvent.pageX - d.startX);
+        if (!downward || scrollOffset.current > 1) return;
+        d.active = true;
+        y.stopAnimation();
+        start.current = current.current;
+      }
+      const t = e.nativeEvent.timestamp ?? Date.now();
+      if (t > d.lastT) d.vy = (pageY - d.lastY) / (t - d.lastT);
+      d.lastY = pageY;
+      d.lastT = t;
+      y.setValue(Math.min(positions.collapsed, Math.max(0, start.current + dy)));
+    },
+    // En touchend pageY no es fiable: se usa la última posición vista en onTouchMove.
+    onTouchEnd: () => {
+      const d = listDrag.current;
+      if (!d.active) return;
+      d.active = false;
+      settleFromList(d.lastY - d.startY);
+    },
+    onTouchCancel: () => {
+      const d = listDrag.current;
+      if (!d.active) return;
+      d.active = false;
+      settleFromList(d.lastY - d.startY);
+    },
+  };
   const scrollEndTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => () => {
@@ -196,7 +254,10 @@ export function NearbySheet({
             nestedScrollEnabled
             decelerationRate={compact ? 'fast' : 'normal'}
             scrollEventThrottle={32}
+            bounces={false}
+            {...listTouch}
             onScroll={(event) => {
+              scrollOffset.current = event.nativeEvent.contentOffset.y;
               if (!compact || compactHeight <= 0) return;
               const index = Math.max(0, Math.round(event.nativeEvent.contentOffset.y / compactHeight));
               if (scrollEndTimer.current) clearTimeout(scrollEndTimer.current);

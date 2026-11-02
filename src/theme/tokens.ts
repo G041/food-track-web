@@ -1,5 +1,6 @@
 import '@/global.css';
 
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { Platform, type ViewStyle } from 'react-native';
 
 const light = {
@@ -91,8 +92,14 @@ export const radius = {
   pill: 999,
 } as const;
 
+// Plus Jakarta Sans: en web la carga global.css; en nativo va embebida con el plugin expo-font (app.json).
+// iOS toma el nombre de familia del archivo; en Android es la familia XML definida en el plugin.
+// Expo Go no incluye las fuentes embebidas: ahí se usa la del sistema.
+const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
 export const font = {
-  family: Platform.select({ web: 'var(--font-display)', default: undefined }),
+  family: isExpoGo
+    ? undefined
+    : Platform.select({ web: 'var(--font-display)', ios: 'Plus Jakarta Sans', android: 'PlusJakartaSans' }),
   size: { xs: 12, sm: 14, md: 16, lg: 20, xl: 26, xxl: 34 },
 } as const;
 

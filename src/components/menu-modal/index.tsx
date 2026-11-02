@@ -14,7 +14,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 
-import { ConfirmDialog } from '@/components/confirm-dialog';
+import { HoldToDeleteButton } from '@/components/hold-to-delete';
 import { AppText, Button, Notice } from '@/components/ui';
 import { useAuth } from '@/features/auth/auth-provider';
 import { useMenuViewer, type MenuTarget } from '@/features/menu/menu-store';
@@ -23,7 +23,7 @@ import { useMenuPreview, type MenuPreview } from '@/features/menu/use-menu-previ
 import { categoryMeta } from '@/lib/categories';
 import { openMenu } from '@/lib/links';
 import { setPageZoomEnabled } from '@/lib/page-zoom';
-import { useHeaderOffset } from '@/hooks/use-header-offset';
+import { useStatusBarInset } from '@/hooks/use-header-offset';
 import { colors, font, radius, shadow, space } from '@/theme/tokens';
 
 import MenuFrame from './menu-frame';
@@ -31,6 +31,8 @@ import MenuFrame from './menu-frame';
 type IconName = ComponentProps<typeof Ionicons>['name'];
 
 const SLOW_MS = 15_000;
+// Borrar un lugar de la base no se puede deshacer: hay que mantener apretado el botón.
+const DELETE_HOLD_SECONDS = 5;
 const WIDE = 768;
 
 /** Modal global con la vista previa del menú. Se abre con useMenuViewer().open(...). */
@@ -50,7 +52,8 @@ export default function MenuModal() {
 type Phase = 'checking' | 'loading' | 'loaded' | 'slow' | 'blocked' | 'broken' | 'unreachable' | 'invalid';
 
 function MenuSheet({ target, onClose }: { target: MenuTarget; onClose: () => void }) {
-  const top = useHeaderOffset();
+  // El menú ocupa toda la pantalla; solo se respeta la franja de la barra de estado.
+  const statusInset = useStatusBarInset();
   const { width } = useWindowDimensions();
   const wide = width >= WIDE;
   const { data: preview, isLoading } = useMenuPreview(target.url);
@@ -58,8 +61,21 @@ function MenuSheet({ target, onClose }: { target: MenuTarget; onClose: () => voi
   const [slow, setSlow] = useState(false);
   const { isAdmin } = useAuth();
   const deleteRestaurant = useDeleteRestaurant();
-  const [confirmDelete, setConfirmDelete] = useState(false);
   const canDelete = isAdmin && target.id != null;
+  // Aviso mientras se mantiene apretado el botón de eliminar, o si se soltó antes de tiempo.
+  const [hint, setHint] = useState<'holding' | 'early' | null>(null);
+  const hintTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (hintTimer.current) clearTimeout(hintTimer.current);
+    },
+    [],
+  );
+  function remindHold() {
+    setHint('early');
+    if (hintTimer.current) clearTimeout(hintTimer.current);
+    hintTimer.current = setTimeout(() => setHint(null), 2500);
+  }
 
   // Arrastrar la cabecera hacia abajo cierra el menú. El contenido es una página de otro sitio dentro de un
   // iframe: el navegador no informa su scroll ni sus toques, así que el gesto vive en la cabecera.
@@ -113,61 +129,82 @@ function MenuSheet({ target, onClose }: { target: MenuTarget; onClose: () => voi
           ? 'slow'
           : 'loading';
 
+  // HUD estilo X: se esconde para dejar el menú a pantalla completa y vuelve cuando hace falta.
+  // Queda fijo mientras el menú no cargó (o hay un error) y mientras se usa el borrado de admin.
+  const hudPinned = phase !== 'loaded' || !!hint || deleteRestaurant.isPending || !!deleteRestaurant.error;
+  const [hudVisible, setHudVisible] = useState(true);
+  const [hud] = useState(() => new Animated.Value(1));
+  const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastScrollY = useRef(0);
+
+  function clearHideTimer() {
+    if (hideTimer.current) clearTimeout(hideTimer.current);
+    hideTimer.current = null;
+  }
+  function scheduleHide(ms: number) {
+    clearHideTimer();
+    hideTimer.current = setTimeout(() => setHudVisible(false), ms);
+  }
+  function revealHud() {
+    setHudVisible(true);
+    scheduleHide(4000);
+  }
+  // Nativo: el WebView informa el scroll. Bajar esconde el HUD, subir lo muestra.
+  function onFrameScroll(y: number) {
+    const dy = y - lastScrollY.current;
+    lastScrollY.current = y;
+    if (Math.abs(dy) < 8) return;
+    clearHideTimer();
+    setHudVisible(dy < 0 || y < 40);
+  }
+
+  // Con el menú cargado, el HUD se retira solo a los pocos segundos.
+  useEffect(() => {
+    if (hudPinned) return;
+    hideTimer.current = setTimeout(() => setHudVisible(false), 2500);
+    return () => {
+      if (hideTimer.current) clearTimeout(hideTimer.current);
+    };
+  }, [hudPinned]);
+
+  // Web: el menú es una página de otro sitio (iframe) que no informa su scroll. Al tocarla, el iframe
+  // toma el foco y la ventana pierde el suyo: se toma como "el usuario está leyendo el menú".
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    const onBlur = () =>
+      setTimeout(() => {
+        if (document.activeElement?.tagName === 'IFRAME') setHudVisible(false);
+      }, 0);
+    window.addEventListener('blur', onBlur);
+    return () => window.removeEventListener('blur', onBlur);
+  }, []);
+
+  useEffect(() => {
+    Animated.timing(hud, {
+      toValue: hudPinned || hudVisible ? 1 : 0,
+      duration: 200,
+      useNativeDriver: Platform.OS !== 'web',
+    }).start();
+  }, [hud, hudPinned, hudVisible]);
+
   const meta = categoryMeta(target.category);
   const host = safeHost(preview?.finalUrl ?? target.url);
   const src = frameSrc(target.url, preview, wide);
 
+  const hudShown = hudPinned || hudVisible;
+  const hudOffset = hud.interpolate({ inputRange: [0, 1], outputRange: [-(statusInset + 120), 0] });
+
   return (
-    <View style={[styles.backdrop, wide && styles.backdropWide]}>
-      <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Cerrar menú" />
-      <Animated.View style={[styles.sheet, wide ? styles.sheetWide : { marginTop: top, transform: [{ translateY: drag }] }]}>
-        <View
-          {...(wide ? {} : pull.panHandlers)}
-          style={[styles.header, Platform.OS === 'web' && !wide && ({ touchAction: 'none' } as unknown as ViewStyle)]}>
-          {!wide && <View style={styles.grab} pointerEvents="none" />}
-          <View style={[styles.icon, { backgroundColor: meta.color }]}>
-            <Ionicons name={meta.icon} size={20} color="#fff" />
-          </View>
-          <View style={{ flex: 1, gap: 2 }}>
-            <AppText variant="heading" numberOfLines={1}>
-              {target.name}
-            </AppText>
-            <View style={styles.subRow}>
-              <StatusChip phase={phase} verified={verified} />
-              <AppText variant="small" numberOfLines={1} style={{ flexShrink: 1 }}>
-                {host}
-              </AppText>
-            </View>
-          </View>
-          <Pressable onPress={() => openMenu(target.url)} hitSlop={8} style={styles.iconButton} accessibilityLabel="Abrir en el navegador">
-            <Ionicons name="open-outline" size={20} color={colors.ink} />
-          </Pressable>
-          {canDelete && (
-            <Pressable
-              onPress={() => {
-                deleteRestaurant.reset();
-                setConfirmDelete(true);
-              }}
-              hitSlop={8}
-              style={[styles.iconButton, { backgroundColor: colors.dangerSoft }]}
-              accessibilityLabel="Eliminar este menú de la base de datos">
-              <Ionicons name="trash-outline" size={20} color={colors.danger} />
-            </Pressable>
-          )}
-          <Pressable onPress={onClose} hitSlop={8} style={styles.iconButton} accessibilityLabel="Cerrar">
-            <Ionicons name="close" size={22} color={colors.ink} />
-          </Pressable>
-        </View>
-
-        {deleteRestaurant.error && !confirmDelete && (
-          <View style={{ padding: space.md }}>
-            <Notice tone="error">{deleteRestaurant.error.message}</Notice>
-          </View>
-        )}
-
+    <View style={styles.backdrop}>
+      <Animated.View style={[styles.sheet, { paddingTop: statusInset, transform: [{ translateY: drag }] }]}>
         <View style={styles.body}>
           {showFrame && (
-            <MenuFrame src={src} sandboxed={preview?.kind !== 'pdf' || !wide} onLoad={() => setLoaded(true)} />
+            <MenuFrame
+              src={src}
+              sandboxed={preview?.kind !== 'pdf' || !wide}
+              onLoad={() => setLoaded(true)}
+              onScrollY={onFrameScroll}
+            />
           )}
 
           {(phase === 'checking' || phase === 'loading') && (
@@ -190,27 +227,79 @@ function MenuSheet({ target, onClose }: { target: MenuTarget; onClose: () => voi
             preview && <Fallback phase={phase} preview={preview} onOpen={() => openMenu(target.url)} onClose={onClose} />
           )}
         </View>
+
+        {/* HUD flotante sobre el menú: se esconde para dejar el menú a pantalla completa. */}
+        <Animated.View
+          pointerEvents={hudShown ? 'box-none' : 'none'}
+          style={[styles.hud, { top: statusInset + space.sm, opacity: hud, transform: [{ translateY: hudOffset }] }]}>
+        <View
+          {...pull.panHandlers}
+          style={[styles.header, Platform.OS === 'web' && ({ touchAction: 'none' } as unknown as ViewStyle)]}>
+          <View style={styles.grab} pointerEvents="none" />
+          <View style={[styles.icon, { backgroundColor: meta.color }]}>
+            <Ionicons name={meta.icon} size={20} color="#fff" />
+          </View>
+          <View style={{ flex: 1, gap: 2 }}>
+            <AppText variant="heading" numberOfLines={1}>
+              {target.name}
+            </AppText>
+            <View style={styles.subRow}>
+              <StatusChip phase={phase} verified={verified} />
+              <AppText variant="small" numberOfLines={1} style={{ flexShrink: 1 }}>
+                {host}
+              </AppText>
+            </View>
+          </View>
+          <Pressable onPress={() => openMenu(target.url)} hitSlop={8} style={styles.iconButton} accessibilityLabel="Abrir en el navegador">
+            <Ionicons name="open-outline" size={20} color={colors.ink} />
+          </Pressable>
+          {canDelete && (
+            <HoldToDeleteButton
+              seconds={DELETE_HOLD_SECONDS}
+              busy={deleteRestaurant.isPending}
+              accessibilityLabel="Eliminar este menú de la base de datos"
+              onHoldChange={(holding) => {
+                if (holding) deleteRestaurant.reset();
+                setHint(holding ? 'holding' : null);
+              }}
+              onEarlyRelease={remindHold}
+              onConfirm={() => deleteRestaurant.mutate(target.id!, { onSuccess: onClose })}
+            />
+          )}
+          <Pressable onPress={onClose} hitSlop={8} style={styles.iconButton} accessibilityLabel="Cerrar">
+            <Ionicons name="close" size={22} color={colors.ink} />
+          </Pressable>
+        </View>
+
+        {(deleteRestaurant.error || hint || deleteRestaurant.isPending) && (
+          <View style={styles.hudNotice}>
+            {deleteRestaurant.error ? (
+              <Notice tone="error">{deleteRestaurant.error.message}</Notice>
+            ) : (
+              <Notice tone="error" icon="trash">
+                {deleteRestaurant.isPending
+                  ? 'Eliminando el menú…'
+                  : hint === 'holding'
+                    ? `Seguí apretando para eliminar este menú. No se puede deshacer.`
+                    : `Mantené apretado el tacho ${DELETE_HOLD_SECONDS} segundos para eliminar este menú.`}
+              </Notice>
+            )}
+          </View>
+        )}
+        </Animated.View>
+
+        {!hudShown && (
+          <Pressable
+            onPress={revealHud}
+            hitSlop={10}
+            style={[styles.reveal, { top: statusInset + space.sm }]}
+            accessibilityRole="button"
+            accessibilityLabel="Mostrar los controles del menú">
+            <Ionicons name="chevron-down" size={20} color={colors.ink} />
+          </Pressable>
+        )}
       </Animated.View>
 
-      <ConfirmDialog
-        visible={confirmDelete}
-        icon="trash"
-        destructive
-        title="¿Eliminar este menú?"
-        message={`Se borra “${target.name}” de la base de datos junto con sus calificaciones, favoritos y reportes. No se puede deshacer.`}
-        confirmLabel="Eliminar"
-        loading={deleteRestaurant.isPending}
-        onCancel={() => setConfirmDelete(false)}
-        onConfirm={() =>
-          deleteRestaurant.mutate(target.id!, {
-            onSuccess: () => {
-              setConfirmDelete(false);
-              onClose();
-            },
-            onError: () => setConfirmDelete(false),
-          })
-        }
-      />
     </View>
   );
 }
@@ -319,25 +408,38 @@ function frameSrc(original: string, preview: MenuPreview | null | undefined, wid
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: colors.scrim, justifyContent: 'flex-end' },
-  backdropWide: { justifyContent: 'center', alignItems: 'center', padding: space.xl },
-  sheet: {
-    flex: 1,
-    backgroundColor: colors.surface,
-    borderTopLeftRadius: radius.lg,
-    borderTopRightRadius: radius.lg,
-    overflow: 'hidden',
-    ...shadow,
-  },
-  sheetWide: { flex: 0, width: '100%', maxWidth: 980, height: '92%', borderRadius: radius.lg },
+  backdrop: { flex: 1, backgroundColor: colors.surface },
+  sheet: { flex: 1, backgroundColor: colors.surface, overflow: 'hidden' },
+  hud: { position: 'absolute', left: space.md, right: space.md, alignItems: 'center', gap: space.sm },
   header: {
+    width: '100%',
+    maxWidth: 720,
     flexDirection: 'row',
     alignItems: 'center',
     gap: space.md,
     paddingHorizontal: space.lg,
-    paddingVertical: space.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.line,
+    paddingTop: space.lg,
+    paddingBottom: space.md,
+    borderRadius: radius.lg,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.line,
+    ...shadow,
+  },
+  hudNotice: { width: '100%', maxWidth: 720 },
+  reveal: {
+    position: 'absolute',
+    alignSelf: 'center',
+    width: 44,
+    height: 28,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.line,
+    alignItems: 'center',
+    justifyContent: 'center',
+    opacity: 0.92,
+    ...shadow,
   },
   grab: { position: 'absolute', top: 5, alignSelf: 'center', left: '50%', marginLeft: -20, width: 40, height: 4, borderRadius: 2, backgroundColor: colors.line },
   icon: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },

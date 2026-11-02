@@ -7,10 +7,10 @@ import { Map, Marker, type MapRef } from 'react-map-gl/maplibre';
 import { StyleSheet, View } from 'react-native';
 
 import { categoryMeta } from '@/lib/categories';
-import { useResolvedTheme } from '@/theme/theme-store';
 import { colors } from '@/theme/tokens';
 
-import { MAP_STYLE_URLS, type RestaurantMapProps } from './types';
+import { useMapStyle } from './map-tones';
+import { type RestaurantMapProps } from './types';
 
 export type { MapMarker, RestaurantMapProps } from './types';
 
@@ -37,7 +37,8 @@ export default function RestaurantMap({
   onPick,
 }: RestaurantMapProps) {
   const mapRef = useRef<MapRef>(null);
-  const theme = useResolvedTheme();
+  // Estilo según el tema y el tono que eligió el usuario (Perfil → Apariencia → Tono del mapa).
+  const mapStyle = useMapStyle();
 
   const focusMap = useCallback((target: NonNullable<RestaurantMapProps['focus']>, centerRestaurantPin = false) => {
     const map = mapRef.current;
@@ -69,7 +70,7 @@ export default function RestaurantMap({
           const target = previewFocus ?? focus;
           if (target) focusMap(target, !!previewFocus);
         }}
-        mapStyle={MAP_STYLE_URLS[theme]}
+        mapStyle={mapStyle as never}
         attributionControl={{ compact: true }}
         style={{ position: 'absolute', inset: 0 }}
         cursor={onPick ? 'crosshair' : 'grab'}

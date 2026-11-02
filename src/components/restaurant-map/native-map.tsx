@@ -4,10 +4,10 @@ import { useEffect, useRef } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { categoryMeta } from '@/lib/categories';
-import { useResolvedTheme } from '@/theme/theme-store';
 import { colors } from '@/theme/tokens';
 
-import { MAP_STYLE_URLS, type RestaurantMapProps } from './types';
+import { useMapStyle } from './map-tones';
+import { type RestaurantMapProps } from './types';
 
 // Mapa nativo (iOS/Android) con MapLibre Native. Misma interfaz y mismo estilo de mapa que index.web.tsx.
 // Lo carga index.tsx solo fuera de Expo Go (Expo Go no trae el módulo nativo de MapLibre).
@@ -27,7 +27,8 @@ export default function NativeMap({
   const cameraRef = useRef<CameraRef>(null);
   // En nativo, tocar un marcador también puede disparar el toque del mapa: se ignora ese segundo evento.
   const lastMarkerPress = useRef(0);
-  const theme = useResolvedTheme();
+  // Estilo según el tema y el tono que eligió el usuario (Perfil → Apariencia → Tono del mapa).
+  const mapStyle = useMapStyle();
 
   useEffect(() => {
     if (!focus) return;
@@ -42,7 +43,7 @@ export default function NativeMap({
       <Map
         ref={mapRef}
         style={StyleSheet.absoluteFill}
-        mapStyle={MAP_STYLE_URLS[theme]}
+        mapStyle={mapStyle as never}
         logo={false}
         attributionPosition={{ bottom: 8, left: 8 }}
         compass={false}

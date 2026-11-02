@@ -14,7 +14,9 @@ import { api, isDemo } from '@/lib/api';
 import { DEMO_ADMIN } from '@/lib/api/demo-api';
 import { categoryMeta } from '@/lib/categories';
 import { displayUsername, formatDate } from '@/lib/text';
-import { useThemePreference, type ThemePreference } from '@/theme/theme-store';
+import { toneSwatch } from '@/components/restaurant-map/map-tones';
+import { useMapTone, type DarkMapTone, type LightMapTone } from '@/theme/map-tone-store';
+import { useResolvedTheme, useThemePreference, type ThemePreference } from '@/theme/theme-store';
 import { colors, radius, space } from '@/theme/tokens';
 
 export default function PerfilScreen() {
@@ -177,8 +179,23 @@ const THEME_OPTIONS: { value: ThemePreference; label: string; icon: 'phone-portr
   { value: 'dark', label: 'Oscuro', icon: 'moon-outline' },
 ];
 
+const LIGHT_TONE_OPTIONS: { value: LightMapTone; label: string }[] = [
+  { value: 'blanco', label: 'Blanco' },
+  { value: 'calido', label: 'Cálido' },
+  { value: 'gris', label: 'Gris' },
+];
+const DARK_TONE_OPTIONS: { value: DarkMapTone; label: string }[] = [
+  { value: 'negro', label: 'Negro' },
+  { value: 'gris-oscuro', label: 'Gris oscuro' },
+  { value: 'gris-claro', label: 'Gris claro' },
+];
+
 function AppearanceCard() {
   const { preference, setPreference } = useThemePreference();
+  const resolved = useResolvedTheme();
+  const tone = useMapTone();
+  // El menú de tonos del mapa se despliega con su botón.
+  const [tonesOpen, setTonesOpen] = useState(false);
   return (
     <Card style={{ gap: space.sm }}>
       <AppText variant="label">Apariencia</AppText>
@@ -195,7 +212,87 @@ function AppearanceCard() {
           </Pressable>
         ))}
       </View>
+
+      <Pressable
+        onPress={() => setTonesOpen((v) => !v)}
+        style={({ pressed }) => [styles.toneToggle, pressed && { opacity: 0.85 }]}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: tonesOpen }}
+        accessibilityLabel={tonesOpen ? 'Ocultar los tonos del mapa' : 'Elegir el tono del mapa'}>
+        <Ionicons name="map-outline" size={18} color={colors.primary} />
+        <AppText style={{ flex: 1, fontWeight: '700' }}>Tono del mapa</AppText>
+        <Ionicons name={tonesOpen ? 'chevron-up' : 'chevron-down'} size={18} color={colors.inkSoft} />
+      </Pressable>
+
+      {tonesOpen && (
+        <FadeIn from={8} duration={200} style={{ gap: space.md }}>
+          <ToneGroup
+            title="Mapa claro"
+            inUse={resolved === 'light'}
+            theme="light"
+            options={LIGHT_TONE_OPTIONS}
+            value={tone.light}
+            onChange={tone.setLight}
+          />
+          <ToneGroup
+            title="Mapa oscuro"
+            inUse={resolved === 'dark'}
+            theme="dark"
+            options={DARK_TONE_OPTIONS}
+            value={tone.dark}
+            onChange={tone.setDark}
+          />
+        </FadeIn>
+      )}
     </Card>
+  );
+}
+
+function ToneGroup<T extends LightMapTone | DarkMapTone>({
+  title,
+  inUse,
+  theme,
+  options,
+  value,
+  onChange,
+}: {
+  title: string;
+  inUse: boolean;
+  theme: 'light' | 'dark';
+  options: { value: T; label: string }[];
+  value: T;
+  onChange: (tone: T) => void;
+}) {
+  return (
+    <View style={{ gap: space.xs }}>
+      <AppText variant="small" style={{ fontWeight: '700', color: colors.ink }}>
+        {title}
+        {inUse ? <AppText variant="small"> · en uso</AppText> : null}
+      </AppText>
+      <View style={styles.toneRow}>
+        {options.map((o) => {
+          const s = toneSwatch(theme, o.value);
+          const active = value === o.value;
+          return (
+            <Pressable
+              key={o.value}
+              onPress={() => onChange(o.value)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: active }}
+              accessibilityLabel={`${title}: ${o.label}`}
+              style={[styles.toneTile, active && styles.toneTileActive]}>
+              <View style={[styles.toneSwatch, { backgroundColor: s.background }]}>
+                <View style={[styles.toneRoad, { backgroundColor: s.road }]} />
+                <View style={[styles.toneWater, { backgroundColor: s.water }]} />
+              </View>
+              <AppText variant="small" style={[{ textAlign: 'center' }, active && { color: colors.ink, fontWeight: '700' }]}>
+                {o.label}
+              </AppText>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
   );
 }
 
@@ -347,6 +444,28 @@ function AuthForm() {
 }
 
 const styles = StyleSheet.create({
+  toneToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.sm,
+    paddingVertical: space.sm,
+    paddingHorizontal: space.md,
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceAlt,
+  },
+  toneRow: { flexDirection: 'row', gap: space.sm },
+  toneTile: {
+    flex: 1,
+    gap: space.xs,
+    padding: space.xs,
+    borderRadius: radius.md,
+    borderWidth: 2,
+    borderColor: colors.line,
+  },
+  toneTileActive: { borderColor: colors.primary },
+  toneSwatch: { height: 44, borderRadius: radius.sm, overflow: 'hidden' },
+  toneRoad: { position: 'absolute', left: 0, right: 0, top: 16, height: 6 },
+  toneWater: { position: 'absolute', right: 0, bottom: 0, width: '40%', height: '45%', borderTopLeftRadius: 10 },
   profileHeader: { flexDirection: 'row', alignItems: 'center', gap: space.md },
   avatar: {
     width: 64,

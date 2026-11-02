@@ -129,115 +129,16 @@ function MenuSheet({ target, onClose }: { target: MenuTarget; onClose: () => voi
           ? 'slow'
           : 'loading';
 
-  // HUD estilo X: se esconde para dejar el menú a pantalla completa y vuelve cuando hace falta.
-  // Queda fijo mientras el menú no cargó (o hay un error) y mientras se usa el borrado de admin.
-  const hudPinned = phase !== 'loaded' || !!hint || deleteRestaurant.isPending || !!deleteRestaurant.error;
-  const [hudVisible, setHudVisible] = useState(true);
-  const [hud] = useState(() => new Animated.Value(1));
-  const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastScrollY = useRef(0);
-
-  function clearHideTimer() {
-    if (hideTimer.current) clearTimeout(hideTimer.current);
-    hideTimer.current = null;
-  }
-  function scheduleHide(ms: number) {
-    clearHideTimer();
-    hideTimer.current = setTimeout(() => setHudVisible(false), ms);
-  }
-  function revealHud() {
-    setHudVisible(true);
-    scheduleHide(4000);
-  }
-  const lastZoom = useRef(1);
-  // Reglas del HUD: scroll hacia arriba lo muestra, hacia abajo lo esconde;
-  // zoom in lo esconde, zoom out lo muestra.
-  function onZoom(scale: number) {
-    const dz = scale - lastZoom.current;
-    lastZoom.current = scale;
-    if (Math.abs(dz) < 0.02) return false;
-    clearHideTimer();
-    setHudVisible(dz < 0);
-    return true;
-  }
-  // Nativo: el WebView informa scroll y zoom.
-  function onFrameScroll(y: number, zoomScale?: number) {
-    if (zoomScale != null && onZoom(zoomScale)) return;
-    const dy = y - lastScrollY.current;
-    lastScrollY.current = y;
-    if (Math.abs(dy) < 8) return;
-    clearHideTimer();
-    setHudVisible(dy < 0 || y < 40);
-  }
-
-  // Web: el pellizco agranda la página entera (el zoom solo está habilitado en este modal),
-  // así que la escala del visualViewport sí se puede leer aunque el menú sea un iframe.
-  useEffect(() => {
-    if (Platform.OS !== 'web' || !window.visualViewport) return;
-    const vv = window.visualViewport;
-    lastZoom.current = vv.scale;
-    const onResize = () => {
-      // Al alejar, la cabecera vuelve recién cerca del tamaño normal: con la página agrandada
-      // se vería ampliada y fuera de lugar.
-      if (vv.scale < lastZoom.current && vv.scale > 1.1) {
-        lastZoom.current = vv.scale;
-        return;
-      }
-      onZoom(vv.scale);
-    };
-    vv.addEventListener('resize', onResize);
-    return () => vv.removeEventListener('resize', onResize);
-    // onZoom solo usa refs y setters estables.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Con el menú cargado, el HUD se retira solo a los pocos segundos.
-  useEffect(() => {
-    if (hudPinned) return;
-    hideTimer.current = setTimeout(() => setHudVisible(false), 2500);
-    return () => {
-      if (hideTimer.current) clearTimeout(hideTimer.current);
-    };
-  }, [hudPinned]);
-
-  // Web: el menú es una página de otro sitio (iframe) que no informa su scroll. Al tocarla, el iframe
-  // toma el foco y la ventana pierde el suyo: se toma como "el usuario está leyendo el menú".
-  useEffect(() => {
-    if (Platform.OS !== 'web') return;
-    const onBlur = () =>
-      setTimeout(() => {
-        if (document.activeElement?.tagName === 'IFRAME') setHudVisible(false);
-      }, 0);
-    window.addEventListener('blur', onBlur);
-    return () => window.removeEventListener('blur', onBlur);
-  }, []);
-
-  useEffect(() => {
-    Animated.timing(hud, {
-      toValue: hudPinned || hudVisible ? 1 : 0,
-      duration: 200,
-      useNativeDriver: Platform.OS !== 'web',
-    }).start();
-  }, [hud, hudPinned, hudVisible]);
-
   const meta = categoryMeta(target.category);
   const host = safeHost(preview?.finalUrl ?? target.url);
   const src = frameSrc(target.url, preview, wide);
-
-  const hudShown = hudPinned || hudVisible;
-  const hudOffset = hud.interpolate({ inputRange: [0, 1], outputRange: [-(statusInset + 120), 0] });
 
   return (
     <View style={styles.backdrop}>
       <Animated.View style={[styles.sheet, { paddingTop: statusInset, transform: [{ translateY: drag }] }]}>
         <View style={styles.body}>
           {showFrame && (
-            <MenuFrame
-              src={src}
-              sandboxed={preview?.kind !== 'pdf' || !wide}
-              onLoad={() => setLoaded(true)}
-              onScrollY={onFrameScroll}
-            />
+            <MenuFrame src={src} sandboxed={preview?.kind !== 'pdf' || !wide} onLoad={() => setLoaded(true)} />
           )}
 
           {(phase === 'checking' || phase === 'loading') && (
@@ -261,10 +162,8 @@ function MenuSheet({ target, onClose }: { target: MenuTarget; onClose: () => voi
           )}
         </View>
 
-        {/* HUD flotante sobre el menú: se esconde para dejar el menú a pantalla completa. */}
-        <Animated.View
-          pointerEvents={hudShown ? 'box-none' : 'none'}
-          style={[styles.hud, { top: statusInset + space.sm, opacity: hud, transform: [{ translateY: hudOffset }] }]}>
+        {/* HUD flotante sobre el menú, siempre visible. */}
+        <View pointerEvents="box-none" style={[styles.hud, { top: statusInset + space.sm }]}>
         <View
           {...pull.panHandlers}
           style={[styles.header, Platform.OS === 'web' && ({ touchAction: 'none' } as unknown as ViewStyle)]}>
@@ -319,18 +218,7 @@ function MenuSheet({ target, onClose }: { target: MenuTarget; onClose: () => voi
             )}
           </View>
         )}
-        </Animated.View>
-
-        {!hudShown && (
-          <Pressable
-            onPress={revealHud}
-            hitSlop={10}
-            style={[styles.reveal, { top: statusInset + space.sm }]}
-            accessibilityRole="button"
-            accessibilityLabel="Mostrar los controles del menú">
-            <Ionicons name="chevron-down" size={20} color={colors.ink} />
-          </Pressable>
-        )}
+        </View>
       </Animated.View>
 
     </View>
@@ -437,6 +325,11 @@ function frameSrc(original: string, preview: MenuPreview | null | undefined, wid
   if (preview?.kind === 'pdf' && !wide && Platform.OS !== 'ios') {
     return `https://docs.google.com/viewer?embedded=true&url=${encodeURIComponent(url)}`;
   }
+  if (preview?.kind === 'pdf') {
+    // Parámetros de apertura de PDF: ocultan la barra de páginas y zoom y el panel lateral del
+    // visor del navegador (Chrome y Edge los respetan; Safari ya muestra un visor mínimo).
+    return `${url.split('#')[0]}#toolbar=0&navpanes=0&view=FitH`;
+  }
   return url;
 }
 
@@ -460,20 +353,6 @@ const styles = StyleSheet.create({
     ...shadow,
   },
   hudNotice: { width: '100%', maxWidth: 720 },
-  reveal: {
-    position: 'absolute',
-    alignSelf: 'center',
-    width: 44,
-    height: 28,
-    borderRadius: radius.pill,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.line,
-    alignItems: 'center',
-    justifyContent: 'center',
-    opacity: 0.92,
-    ...shadow,
-  },
   grab: { position: 'absolute', top: 5, alignSelf: 'center', left: '50%', marginLeft: -20, width: 40, height: 4, borderRadius: 2, backgroundColor: colors.line },
   icon: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   subRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },

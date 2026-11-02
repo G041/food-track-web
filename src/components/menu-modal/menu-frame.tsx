@@ -11,7 +11,9 @@ export default function MenuFrame({ src, onLoad, onScrollY }: MenuFrameProps) {
       key={src}
       source={{ uri: src }}
       onLoadEnd={onLoad}
-      onScroll={(e: { nativeEvent: { contentOffset: { y: number } } }) => onScrollY?.(e.nativeEvent.contentOffset.y)}
+      onScroll={(e: { nativeEvent: { contentOffset: { y: number }; zoomScale?: number } }) =>
+        onScrollY?.(e.nativeEvent.contentOffset.y, e.nativeEvent.zoomScale)
+      }
       // Los links target="_blank" se abren en el mismo WebView en vez de quedar muertos.
       setSupportMultipleWindows={false}
       // Equivalente al sandbox de la web: el sitio no abre otras apps (tel:, intent:, etc.) sin pasar por el sistema.

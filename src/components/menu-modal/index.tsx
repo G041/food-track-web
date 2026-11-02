@@ -149,14 +149,47 @@ function MenuSheet({ target, onClose }: { target: MenuTarget; onClose: () => voi
     setHudVisible(true);
     scheduleHide(4000);
   }
-  // Nativo: el WebView informa el scroll. Bajar esconde el HUD, subir lo muestra.
-  function onFrameScroll(y: number) {
+  const lastZoom = useRef(1);
+  // Reglas del HUD: scroll hacia arriba lo muestra, hacia abajo lo esconde;
+  // zoom in lo esconde, zoom out lo muestra.
+  function onZoom(scale: number) {
+    const dz = scale - lastZoom.current;
+    lastZoom.current = scale;
+    if (Math.abs(dz) < 0.02) return false;
+    clearHideTimer();
+    setHudVisible(dz < 0);
+    return true;
+  }
+  // Nativo: el WebView informa scroll y zoom.
+  function onFrameScroll(y: number, zoomScale?: number) {
+    if (zoomScale != null && onZoom(zoomScale)) return;
     const dy = y - lastScrollY.current;
     lastScrollY.current = y;
     if (Math.abs(dy) < 8) return;
     clearHideTimer();
     setHudVisible(dy < 0 || y < 40);
   }
+
+  // Web: el pellizco agranda la página entera (el zoom solo está habilitado en este modal),
+  // así que la escala del visualViewport sí se puede leer aunque el menú sea un iframe.
+  useEffect(() => {
+    if (Platform.OS !== 'web' || !window.visualViewport) return;
+    const vv = window.visualViewport;
+    lastZoom.current = vv.scale;
+    const onResize = () => {
+      // Al alejar, la cabecera vuelve recién cerca del tamaño normal: con la página agrandada
+      // se vería ampliada y fuera de lugar.
+      if (vv.scale < lastZoom.current && vv.scale > 1.1) {
+        lastZoom.current = vv.scale;
+        return;
+      }
+      onZoom(vv.scale);
+    };
+    vv.addEventListener('resize', onResize);
+    return () => vv.removeEventListener('resize', onResize);
+    // onZoom solo usa refs y setters estables.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Con el menú cargado, el HUD se retira solo a los pocos segundos.
   useEffect(() => {

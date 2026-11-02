@@ -1,8 +1,8 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from 'react-native';
 
-import { HoldToDeleteButton } from '@/components/hold-to-delete';
+import { HoldConfirmDialog } from '@/components/hold-confirm-dialog';
 import { FadeIn } from '@/components/motion';
 import { AppText, Button, Card, Notice } from '@/components/ui';
 import { useAddNote, useAdminNotes, useDeleteNote, useSetNoteDone } from '@/features/restaurants/queries';
@@ -11,7 +11,7 @@ import { displayUsername, formatDate } from '@/lib/text';
 import { colors, font, radius, space } from '@/theme/tokens';
 
 const MAX = 2000;
-// Borrar una nota no se puede deshacer: hay que mantener apretado el botón.
+// Borrar una nota no se puede deshacer: en la confirmación hay que mantener apretado "Eliminar".
 const DELETE_HOLD_SECONDS = 3;
 
 /** Notas internas del equipo (ideas y pendientes). Solo se monta para admins; la base también lo exige (RLS). */
@@ -21,6 +21,7 @@ export function AdminNotes() {
   const [draft, setDraft] = useState('');
   // Colapsadas por defecto para no ocupar el Perfil.
   const [expanded, setExpanded] = useState(false);
+  const [toDelete, setToDelete] = useState<AdminNote | null>(null);
   const del = useDeleteNote();
 
   const open = notes.filter((n) => !n.done);
@@ -90,7 +91,13 @@ export function AdminNotes() {
         <View style={{ gap: space.sm }}>
           {[...open, ...done].map((n) => (
             <FadeIn key={n.id} from={6} duration={200}>
-              <NoteRow note={n} deleting={del.isPending && del.variables === n.id} onDelete={() => del.mutate(n.id)} />
+              <NoteRow
+                note={n}
+                onDelete={() => {
+                  del.reset();
+                  setToDelete(n);
+                }}
+              />
             </FadeIn>
           ))}
         </View>
@@ -98,25 +105,25 @@ export function AdminNotes() {
 
         </>
       )}
+
+      <HoldConfirmDialog
+        visible={!!toDelete}
+        seconds={DELETE_HOLD_SECONDS}
+        title="¿Estás seguro que querés eliminar la nota?"
+        message={toDelete ? `“${toDelete.body.slice(0, 80)}${toDelete.body.length > 80 ? '…' : ''}”` : undefined}
+        busy={del.isPending}
+        error={del.error?.message}
+        onCancel={() => setToDelete(null)}
+        onConfirm={() => {
+          if (toDelete) del.mutate(toDelete.id, { onSuccess: () => setToDelete(null) });
+        }}
+      />
     </Card>
   );
 }
 
-function NoteRow({ note, deleting, onDelete }: { note: AdminNote; deleting: boolean; onDelete: () => void }) {
+function NoteRow({ note, onDelete }: { note: AdminNote; onDelete: () => void }) {
   const toggle = useSetNoteDone();
-  const [hint, setHint] = useState<'holding' | 'early' | null>(null);
-  const hintTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(
-    () => () => {
-      if (hintTimer.current) clearTimeout(hintTimer.current);
-    },
-    [],
-  );
-  function remindHold() {
-    setHint('early');
-    if (hintTimer.current) clearTimeout(hintTimer.current);
-    hintTimer.current = setTimeout(() => setHint(null), 2500);
-  }
   const done = toggle.isPending ? !note.done : note.done; // respuesta inmediata al tocar
   return (
     <View style={[styles.note, done && styles.noteDone]}>
@@ -130,30 +137,14 @@ function NoteRow({ note, deleting, onDelete }: { note: AdminNote; deleting: bool
       </Pressable>
       <View style={{ flex: 1, gap: 2 }}>
         <AppText style={[styles.noteBody, done && styles.noteBodyDone]}>{note.body}</AppText>
-        {hint || deleting ? (
-          <AppText variant="small" style={{ fontSize: font.size.xs, color: colors.danger, fontWeight: '700' }}>
-            {deleting
-              ? 'Borrando la nota…'
-              : hint === 'holding'
-                ? 'Seguí apretando para borrar. No se puede deshacer.'
-                : `Mantené apretado el tacho ${DELETE_HOLD_SECONDS} segundos para borrar.`}
-          </AppText>
-        ) : (
-          <AppText variant="small" style={{ fontSize: font.size.xs }}>
-            {displayUsername(note.author)} · {formatDate(note.created_at)}
-          </AppText>
-        )}
+        <AppText variant="small" style={{ fontSize: font.size.xs }}>
+          {displayUsername(note.author)} · {formatDate(note.created_at)}
+        </AppText>
       </View>
-      <HoldToDeleteButton
-        seconds={DELETE_HOLD_SECONDS}
-        size={32}
-        iconSize={18}
-        busy={deleting}
-        accessibilityLabel="Borrar nota"
-        onHoldChange={(holding) => setHint(holding ? 'holding' : null)}
-        onEarlyRelease={remindHold}
-        onConfirm={onDelete}
-      />
+      {/* Abre la confirmación; ahí "Eliminar" se mantiene apretado. */}
+      <Pressable onPress={onDelete} hitSlop={8} accessibilityRole="button" accessibilityLabel="Borrar nota">
+        <Ionicons name="trash-outline" size={18} color={colors.inkMuted} />
+      </Pressable>
     </View>
   );
 }

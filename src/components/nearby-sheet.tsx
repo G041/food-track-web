@@ -11,6 +11,8 @@ import {
   type ViewStyle,
 } from 'react-native';
 
+import { useIsFocused } from 'expo-router';
+
 import type { SheetSnap } from '@/features/map/sheet-store';
 import { colors, font, MAX_CONTENT_WIDTH, radius, shadow, space } from '@/theme/tokens';
 
@@ -162,8 +164,18 @@ export function NearbySheet({
     return () => y.removeListener(id);
   }, [y]);
 
+  // Con la pantalla del mapa oculta (p. ej. al tocar "Mapa" desde otra pestaña), el panel se ubica
+  // sin animar: si no, se lo vería bajar un instante al volver.
+  const focused = useIsFocused();
   useEffect(() => {
+    if (!focused) {
+      y.stopAnimation();
+      y.setValue(positions[snap]);
+      return;
+    }
     Animated.spring(y, { toValue: positions[snap], useNativeDriver: native, bounciness: 2, speed: 14 }).start();
+    // focused no está en las dependencias a propósito: volver a la pestaña no debe re-animar.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [snap, positions, y]);
 
   useEffect(() => {

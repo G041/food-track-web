@@ -3,6 +3,7 @@ import { router, useIsFocused } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import { FadeIn } from '@/components/motion';
 import { QrImageStep } from '@/components/qr-image-step';
 import { QrScanner } from '@/components/qr-scanner';
 import RestaurantMap from '@/components/restaurant-map';
@@ -58,6 +59,8 @@ export default function AportarScreen() {
   return (
     <Screen>
       <Header />
+      {/* Cada paso entra animado al cambiar (elegir origen, escanear, formulario, listo). */}
+      <FadeIn key={step} from={16} duration={240} style={styles.stepWrap}>
       {step === 'source' && (
         <>
           <OptionCard
@@ -116,6 +119,7 @@ export default function AportarScreen() {
           </View>
         </Card>
       )}
+      </FadeIn>
     </Screen>
   );
 }
@@ -380,6 +384,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   stepRow: { flexDirection: 'row', gap: space.sm, alignItems: 'center' },
+  stepWrap: { gap: space.lg },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
   error: { color: colors.danger, fontSize: 12, fontWeight: '600' },
   locationHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },

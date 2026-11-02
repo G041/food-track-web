@@ -151,7 +151,7 @@ export function RestaurantCard({
           </AppText>
         )}
         <View style={styles.actions}>
-          <Button title="Ver menú" icon="restaurant" onPress={onOpenMenu} style={styles.menuButton} />
+          <Button title="Menú" icon="restaurant" onPress={onOpenMenu} style={styles.menuButton} />
           <Button
             title={myRating ? `Tu nota: ${myRating}★` : 'Calificar'}
             icon={myRating ? undefined : 'star-outline'}

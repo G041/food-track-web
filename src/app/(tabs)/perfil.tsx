@@ -5,6 +5,7 @@ import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
 import { AdminNotes } from '@/components/admin-notes';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { FadeIn } from '@/components/motion';
 import { useDebugPanel } from '@/components/safe-area-debug';
 import { AppText, Button, Card, Notice, Screen, StatusBadge, TextField } from '@/components/ui';
 import { useAuth } from '@/features/auth/auth-provider';
@@ -269,6 +270,8 @@ function AuthForm() {
         ))}
       </View>
 
+      {/* Cambiar entre Ingresar y Crear cuenta anima el formulario. */}
+      <FadeIn key={mode} from={12} duration={220}>
       <Card>
         <TextField
           label={mode === 'login' ? 'Email o usuario' : 'Email'}
@@ -331,6 +334,7 @@ function AuthForm() {
         {info && <Notice tone="success">{info}</Notice>}
         <Button title={mode === 'login' ? 'Ingresar' : 'Crear cuenta'} loading={loading} onPress={submit} />
       </Card>
+      </FadeIn>
 
       {isDemo && (
         <Notice>

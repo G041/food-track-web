@@ -3,7 +3,7 @@
     "name": "FoodTrack",
     "slug": "food-track",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/images/icon.png",
     "scheme": "foodtrack",
     "userInterfaceStyle": "light",
@@ -53,6 +53,12 @@
         {
           "cameraPermission": "FoodTrack usa la cámara para leer el código QR del menú.",
           "recordAudioAndroid": false
+        }
+      ],
+      [
+        "expo-screen-orientation",
+        {
+          "initialOrientation": "PORTRAIT_UP"
         }
       ],
       [

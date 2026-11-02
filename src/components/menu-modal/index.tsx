@@ -14,8 +14,8 @@ import {
   type ViewStyle,
 } from 'react-native';
 
-import { HoldToDeleteButton } from '@/components/hold-to-delete';
-import { AppText, Button, Notice } from '@/components/ui';
+import { HoldConfirmDialog } from '@/components/hold-confirm-dialog';
+import { AppText, Button } from '@/components/ui';
 import { useAuth } from '@/features/auth/auth-provider';
 import { useMenuViewer, type MenuTarget } from '@/features/menu/menu-store';
 import { useDeleteRestaurant } from '@/features/restaurants/queries';
@@ -24,6 +24,8 @@ import { categoryMeta } from '@/lib/categories';
 import { openMenu } from '@/lib/links';
 import { setPageZoomEnabled } from '@/lib/page-zoom';
 import { useStatusBarInset } from '@/hooks/use-header-offset';
+import { allowRotation, lockPortrait } from '@/lib/orientation';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, font, radius, shadow, space } from '@/theme/tokens';
 
 import MenuFrame from './menu-frame';
@@ -34,16 +36,25 @@ const SLOW_MS = 15_000;
 // Borrar un lugar de la base no se puede deshacer: hay que mantener apretado el botón.
 const DELETE_HOLD_SECONDS = 5;
 const WIDE = 768;
+const WIDE_MIN_SIDE = 500;
 
 /** Modal global con la vista previa del menú. Se abre con useMenuViewer().open(...). */
 export default function MenuModal() {
   const { target, close } = useMenuViewer();
-  // El zoom de página solo se permite mientras se lee un menú.
+  // El zoom de página y girar el teléfono solo se permiten mientras se lee un menú;
+  // el resto de la app queda en vertical.
   useEffect(() => {
     setPageZoomEnabled(!!target);
+    if (target) allowRotation();
+    else lockPortrait();
   }, [target]);
   return (
-    <Modal visible={!!target} transparent animationType="slide" onRequestClose={close}>
+    <Modal
+      visible={!!target}
+      transparent
+      animationType="slide"
+      onRequestClose={close}
+      supportedOrientations={['portrait', 'landscape', 'landscape-left', 'landscape-right']}>
       {target && <MenuSheet key={target.url} target={target} onClose={close} />}
     </Modal>
   );
@@ -52,31 +63,23 @@ export default function MenuModal() {
 type Phase = 'checking' | 'loading' | 'loaded' | 'slow' | 'blocked' | 'broken' | 'unreachable' | 'invalid';
 
 function MenuSheet({ target, onClose }: { target: MenuTarget; onClose: () => void }) {
-  // El menú ocupa toda la pantalla; solo se respeta la franja de la barra de estado.
-  const statusInset = useStatusBarInset();
-  const { width } = useWindowDimensions();
-  const wide = width >= WIDE;
+  // El menú ocupa toda la pantalla; solo se respetan las zonas del sistema (barra de estado
+  // en vertical; notch y bordes laterales en horizontal, donde iOS oculta la barra de estado).
+  const { width, height } = useWindowDimensions();
+  const landscape = width > height;
+  const insets = useSafeAreaInsets();
+  const statusBar = useStatusBarInset();
+  const statusInset = landscape ? insets.top : statusBar;
+  // "Pantalla grande" por el lado corto: así un celular girado sigue usando el visor de PDF móvil
+  // (y el iframe no se recarga al rotar), mientras tablets y computadoras usan el del navegador.
+  const wide = Math.min(width, height) >= WIDE_MIN_SIDE && Math.max(width, height) >= WIDE;
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const { data: preview, isLoading } = useMenuPreview(target.url);
   const [loaded, setLoaded] = useState(false);
   const [slow, setSlow] = useState(false);
   const { isAdmin } = useAuth();
   const deleteRestaurant = useDeleteRestaurant();
   const canDelete = isAdmin && target.id != null;
-  // Aviso mientras se mantiene apretado el botón de eliminar, o si se soltó antes de tiempo.
-  const [hint, setHint] = useState<'holding' | 'early' | null>(null);
-  const hintTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(
-    () => () => {
-      if (hintTimer.current) clearTimeout(hintTimer.current);
-    },
-    [],
-  );
-  function remindHold() {
-    setHint('early');
-    if (hintTimer.current) clearTimeout(hintTimer.current);
-    hintTimer.current = setTimeout(() => setHint(null), 2500);
-  }
-
   // Arrastrar la cabecera hacia abajo cierra el menú. El contenido es una página de otro sitio dentro de un
   // iframe: el navegador no informa su scroll ni sus toques, así que el gesto vive en la cabecera.
   const [drag] = useState(() => new Animated.Value(0));
@@ -135,7 +138,11 @@ function MenuSheet({ target, onClose }: { target: MenuTarget; onClose: () => voi
 
   return (
     <View style={styles.backdrop}>
-      <Animated.View style={[styles.sheet, { paddingTop: statusInset, transform: [{ translateY: drag }] }]}>
+      <Animated.View
+        style={[
+          styles.sheet,
+          { paddingTop: statusInset, paddingLeft: insets.left, paddingRight: insets.right, transform: [{ translateY: drag }] },
+        ]}>
         <View style={styles.body}>
           {showFrame && (
             <MenuFrame src={src} sandboxed={preview?.kind !== 'pdf' || !wide} onLoad={() => setLoaded(true)} />
@@ -163,7 +170,12 @@ function MenuSheet({ target, onClose }: { target: MenuTarget; onClose: () => voi
         </View>
 
         {/* HUD flotante sobre el menú, siempre visible. */}
-        <View pointerEvents="box-none" style={[styles.hud, { top: statusInset + space.sm }]}>
+        <View
+          pointerEvents="box-none"
+          style={[
+            styles.hud,
+            { top: statusInset + space.sm, left: insets.left + space.md, right: insets.right + space.md },
+          ]}>
         <View
           {...pull.panHandlers}
           style={[styles.header, Platform.OS === 'web' && ({ touchAction: 'none' } as unknown as ViewStyle)]}>
@@ -186,41 +198,44 @@ function MenuSheet({ target, onClose }: { target: MenuTarget; onClose: () => voi
             <Ionicons name="open-outline" size={20} color={colors.ink} />
           </Pressable>
           {canDelete && (
-            <HoldToDeleteButton
-              seconds={DELETE_HOLD_SECONDS}
-              busy={deleteRestaurant.isPending}
-              accessibilityLabel="Eliminar este menú de la base de datos"
-              onHoldChange={(holding) => {
-                if (holding) deleteRestaurant.reset();
-                setHint(holding ? 'holding' : null);
+            <Pressable
+              onPress={() => {
+                deleteRestaurant.reset();
+                setConfirmDelete(true);
               }}
-              onEarlyRelease={remindHold}
-              onConfirm={() => deleteRestaurant.mutate(target.id!, { onSuccess: onClose })}
-            />
+              hitSlop={8}
+              style={[styles.iconButton, { backgroundColor: colors.dangerSoft }]}
+              accessibilityLabel="Eliminar este menú de la base de datos">
+              <Ionicons name="trash-outline" size={20} color={colors.danger} />
+            </Pressable>
           )}
           <Pressable onPress={onClose} hitSlop={8} style={styles.iconButton} accessibilityLabel="Cerrar">
             <Ionicons name="close" size={22} color={colors.ink} />
           </Pressable>
         </View>
 
-        {(deleteRestaurant.error || hint || deleteRestaurant.isPending) && (
-          <View style={styles.hudNotice}>
-            {deleteRestaurant.error ? (
-              <Notice tone="error">{deleteRestaurant.error.message}</Notice>
-            ) : (
-              <Notice tone="error" icon="trash">
-                {deleteRestaurant.isPending
-                  ? 'Eliminando el menú…'
-                  : hint === 'holding'
-                    ? `Seguí apretando para eliminar este menú. No se puede deshacer.`
-                    : `Mantené apretado el tacho ${DELETE_HOLD_SECONDS} segundos para eliminar este menú.`}
-              </Notice>
-            )}
-          </View>
-        )}
         </View>
       </Animated.View>
 
+      {/* Confirmación de borrado (solo admins): "Eliminar" hay que mantenerlo apretado 5 segundos. */}
+      <HoldConfirmDialog
+        inline
+        visible={confirmDelete}
+        seconds={DELETE_HOLD_SECONDS}
+        title="¿Estás seguro que querés eliminar el menú?"
+        message={`Se borra “${target.name}” de la base de datos junto con sus calificaciones, favoritos y reportes. No se puede deshacer.`}
+        busy={deleteRestaurant.isPending}
+        error={deleteRestaurant.error?.message}
+        onCancel={() => setConfirmDelete(false)}
+        onConfirm={() =>
+          deleteRestaurant.mutate(target.id!, {
+            onSuccess: () => {
+              setConfirmDelete(false);
+              onClose();
+            },
+          })
+        }
+      />
     </View>
   );
 }
@@ -352,7 +367,6 @@ const styles = StyleSheet.create({
     borderColor: colors.line,
     ...shadow,
   },
-  hudNotice: { width: '100%', maxWidth: 720 },
   grab: { position: 'absolute', top: 5, alignSelf: 'center', left: '50%', marginLeft: -20, width: 40, height: 4, borderRadius: 2, backgroundColor: colors.line },
   icon: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   subRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },

@@ -39,7 +39,8 @@ export default function RootLayout() {
         <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />
         <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
           <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="admin" options={{ title: 'Moderación' }} />
+          {/* Nativo: entra deslizándose; en web la anima ScreenTransition (dentro de Screen). */}
+          <Stack.Screen name="admin" options={{ title: 'Moderación', animation: 'slide_from_right' }} />
         </Stack>
         <MenuModal />
         <StatusBarScrim />

@@ -1,8 +1,8 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Platform, Pressable, StyleSheet, type ViewStyle } from 'react-native';
+import { Animated, Easing, Platform, Pressable, StyleSheet, Text, type ViewStyle } from 'react-native';
 
-import { colors } from '@/theme/tokens';
+import { colors, font, radius } from '@/theme/tokens';
 
 const web = Platform.OS === 'web';
 // Sin menú contextual ni selección al mantener apretado.
@@ -23,6 +23,8 @@ export function HoldToDeleteButton({
   size = 38,
   iconSize = 20,
   background = colors.dangerSoft,
+  label,
+  style,
   accessibilityLabel,
 }: {
   seconds: number;
@@ -35,6 +37,9 @@ export function HoldToDeleteButton({
   size?: number;
   iconSize?: number;
   background?: string;
+  /** Con texto se muestra como botón ancho (p. ej. en un diálogo) en vez de un ícono redondo. */
+  label?: string;
+  style?: ViewStyle;
   accessibilityLabel: string;
 }) {
   const [progress] = useState(() => new Animated.Value(0));
@@ -81,14 +86,24 @@ export function HoldToDeleteButton({
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       accessibilityHint={`Mantené apretado ${seconds} segundos para confirmar`}
-      style={[styles.button, noSelect, { width: size, height: size, borderRadius: size / 2, backgroundColor: background }]}>
+      style={[
+        styles.button,
+        noSelect,
+        label
+          ? [styles.wide, { backgroundColor: background }]
+          : { width: size, height: size, borderRadius: size / 2, backgroundColor: background },
+        style,
+      ]}>
       <Animated.View pointerEvents="none" style={[styles.fill, { width }]} />
       <Ionicons name="trash-outline" size={iconSize} color={colors.danger} />
+      {label && <Text style={styles.label}>{label}</Text>}
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   button: { alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  wide: { flexDirection: 'row', gap: 8, minHeight: 48, paddingHorizontal: 18, borderRadius: radius.md },
+  label: { color: colors.danger, fontWeight: '800', fontSize: font.size.md, fontFamily: font.family },
   fill: { position: 'absolute', left: 0, top: 0, bottom: 0, backgroundColor: colors.danger, opacity: 0.4 },
 });

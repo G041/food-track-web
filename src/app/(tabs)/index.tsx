@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Animated, Keyboard, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { ConfirmDialog } from '@/components/confirm-dialog';
-import { FadeIn, useMountTransition } from '@/components/motion';
+import { FadeIn, ScreenTransition, useMountTransition } from '@/components/motion';
 import { NearbySheet } from '@/components/nearby-sheet';
 import { RatingDialog } from '@/components/rating-dialog';
 import { ReportDialog } from '@/components/report-dialog';
@@ -129,7 +129,8 @@ export default function MapScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    // Entrada animada al volver a la pestaña Mapa, igual que el resto de las pantallas.
+    <ScreenTransition style={styles.container}>
       <RestaurantMap
         markers={markers}
         selectedId={selectedId}
@@ -385,7 +386,7 @@ export default function MapScreen() {
           router.navigate('/perfil');
         }}
       />
-    </View>
+    </ScreenTransition>
   );
 }
 

@@ -1,0 +1,31 @@
+name: Keep Supabase active
+
+# El plan Free de Supabase pausa el proyecto tras 7 días sin actividad.
+# Cada 3 días se hace una consulta mínima por la API pública: 1 fila de categorías, solo el slug.
+# Usa la clave pública (la misma que va en la app web); nunca la secreta.
+on:
+  schedule:
+    - cron: '17 12 */3 * *'
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Consulta mínima a Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_KEY" ]; then
+            echo "::error::Faltan los secretos SUPABASE_URL y SUPABASE_PUBLISHABLE_KEY del repo"
+            exit 1
+          fi
+          status=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 \
+            -H "apikey: $SUPABASE_KEY" \
+            "$SUPABASE_URL/rest/v1/categories?select=slug&limit=1")
+          echo "Supabase respondió $status"
+          [ "$status" = "200" ]

@@ -53,3 +53,6 @@ public/maplibre-gl-worker.mjs
 .env*
 !.env.example
 supabase/.temp/
+
+# graphify
+graphify-out/

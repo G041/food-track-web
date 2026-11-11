@@ -4,7 +4,7 @@ Estado al 28/10/2026. **La app está en producción:** https://food-track-web.ve
 
 Lo que sigue está ordenado por prioridad. Cada ítem es una casilla para tachar cuando se resuelve.
 
-Última revisión: 29/10/2026. Las aclaraciones de implementación se contrastaron con el código local. Esta revisión no reemplaza las pruebas de registro, instalación y cámara en dispositivos reales que siguen pendientes.
+Última revisión: 11/11/2026 (sección 5 y keep-alive). Revisión anterior: 29/10/2026. Las aclaraciones de implementación se contrastaron con el código local. Esta revisión no reemplaza las pruebas de registro, instalación y cámara en dispositivos reales que siguen pendientes.
 
 ---
 
@@ -90,14 +90,16 @@ Lo que sigue está ordenado por prioridad. Cada ítem es una casilla para tachar
 - [ ] **Tipos generados** desde el esquema con `npx supabase gen types typescript` (hoy `src/lib/api/types.ts` está escrito a mano).
 - [ ] **Agregar `.gitattributes`** (`* text=auto eol=lf`) para evitar los avisos de LF/CRLF en Windows.
 - [ ] **Revisar `npm audit`** (hay avisos en dependencias transitivas).
-- [ ] **Keep-alive de Supabase:** el plan Free pausa el proyecto tras 7 días sin actividad. Se resuelve con un cron en GitHub Actions o pasando al plan Pro cuando haya usuarios.
+- [x] **Keep-alive de Supabase: descartado (11/11/2026).** El plan Free pausa el proyecto tras 7 días sin actividad y se decidió aceptarlo. El workflow `keep-supabase-active.yml` está desactivado en GitHub (fallaba por falta de los secretos `SUPABASE_URL` y `SUPABASE_PUBLISHABLE_KEY`). Si el proyecto se pausa, hay que reactivarlo desde el panel de Supabase. Pasar a Pro lo evita cuando haya usuarios.
 - [ ] **Monitoreo de errores** (Sentry, opcional).
 
 ## 🟣 5. Camino a la app nativa
 
 - [ ] **Tema dinámico en nativo:** web ya permite claro, oscuro o sistema. `useResolvedTheme` en `src/theme/theme-store.ts` devuelve siempre `light` fuera de web y `app.json` mantiene `userInterfaceStyle: "light"`.
-- [ ] Implementar `src/components/restaurant-map/index.tsx` con `@maplibre/maplibre-react-native` respetando `RestaurantMapProps` (hoy muestra un marcador de lugar).
-- [ ] Crear un **development build** con EAS: MapLibre nativo no corre en Expo Go. Falta agregar `eas.json`.
+- [x] **Mapa nativo implementado:** `native-map.tsx` usa `@maplibre/maplibre-react-native` con la misma interfaz `RestaurantMapProps`. `index.tsx` lo carga en un development build o en la app publicada.
+- [x] **Mapa en Expo Go (11/11/2026):** Expo Go no trae MapLibre, así que ahí se usa `expo-go-map.tsx` con `react-native-maps` (Apple Maps en iOS). Verificado en iPhone. Solo sirve para probar; el estilo y los tonos del mapa de la web no se aplican.
+- [ ] Crear un **development build** con EAS para ver el mapa real con MapLibre en el celular (en iPhone requiere cuenta Apple Developer de pago). `eas.json` ya existe con los perfiles `development`, `preview` y `production`.
+- [ ] Probar el mapa nativo con MapLibre en un Android real.
 - [ ] Sesión en nativo: hoy usa AsyncStorage. Evaluar SecureStore cifrado y refrescar la sesión al volver a primer plano (`AppState` + `startAutoRefresh`).
 - [ ] Probar cámara y ubicación en dispositivos físicos. Los textos de permisos ya están en `app.json`.
 - [ ] Cuentas de tienda: Apple Developer (USD 99/año) y Google Play (USD 25, pago único). Política de privacidad publicada.

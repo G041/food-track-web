@@ -40,7 +40,12 @@ Lo que sigue está ordenado por prioridad. Cada ítem es una casilla para tachar
 - [ ] **Completar la verificación de la franja inferior en iOS instalada:** corrección desplegada en `90a3fe1`, usando `100vh` sin fijar `html/body` en modo standalone. El usuario probó la versión local en iPhone; faltan las comprobaciones sistemáticas de apertura en frío, rotación, teclado y vuelta desde segundo plano. El diagnóstico muestra el tamaño del documento y de `#root`.
 - [x] **Identidad de la versión local:** ícono azul y nombre "FoodTrack Local" para localhost y redes privadas (`public/manifest-local.json`, `public/icons/local/`). La web pública conserva su identidad habitual.
 - [x] **Claridad de las tarjetas y panel de cercanos:** botón "Ir" para ubicar el lugar en el mapa, fondo y borde en las tarjetas de la lista, flecha de indicaciones con ajuste óptico y panel plegado 22px más abajo.
-- [ ] **Rate limit del login con usuario:** las llamadas a Supabase salen desde las IPs de Vercel. Con mucho tráfico conviene limitar los intentos por usuario.
+- [x] **Rate limit del login con usuario** (12/11/2026): `api/login` cuenta los intentos fallidos en la tabla `login_attempts` (10 por usuario y 30 por IP cada 15 minutos). Requiere la migración `20261112000000_security_hardening.sql`.
+- [ ] **Activar la verificación anti-bots (CAPTCHA).** El código ya está (`src/components/captcha`, `public/captcha.html`); falta configurarlo, en este orden:
+  1. Crear un widget de Turnstile en Cloudflare (modo *Managed*) con los dominios `food-track-web.vercel.app` y `localhost`.
+  2. Cargar la clave pública como `EXPO_PUBLIC_TURNSTILE_SITE_KEY` en Vercel y en `eas.json` (`build.base.env`), y publicar web y builds nativos.
+  3. Recién cuando todos usen la versión nueva: en Supabase → Authentication → Attack Protection, activar CAPTCHA con Turnstile y la clave secreta. Antes de eso, activarlo rompe el login de las versiones viejas.
+- [ ] **Límites de Supabase Auth** (Authentication → Rate Limits): revisar emails por hora, registros y logins por IP. Configurar un SMTP propio: el de Supabase tiene un cupo muy chico de emails para todo el proyecto y un atacante lo puede agotar.
 
 ## 🟠 2. Funcionalidad que falta
 

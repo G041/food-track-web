@@ -48,6 +48,7 @@
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.12",
     "@electric-sql/pglite-postgis": "^0.2.12",
+    "@types/node": "^26.6.6",
     "@types/react": "~19.3.0",
     "eslint": "^9.0.0",
     "eslint-config-expo": "~58.0.4",

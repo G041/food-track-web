@@ -15,6 +15,8 @@ export type Restaurant = {
   reviewed_at: string | null;
   review_note: string | null;
   created_at: string;
+  /** Última edición. La revisión de un admin la manda de vuelta para aprobar solo lo que vio. */
+  updated_at?: string;
 };
 
 export type PendingRestaurant = Restaurant & { submitter: string | null };
@@ -72,7 +74,8 @@ export interface Api {
   withdraw(id: number): Promise<void>;
   /** Solo admin: borra un lugar de la base (también sus calificaciones, favoritos y reportes). */
   deleteRestaurant(id: number): Promise<void>;
-  review(id: number, decision: ReviewDecision, note?: string): Promise<void>;
+  /** seenAt: updated_at del aporte tal como lo vio el admin; si cambió desde entonces, la revisión falla. */
+  review(id: number, decision: ReviewDecision, note?: string, seenAt?: string): Promise<void>;
 
   /** Promedio y cantidad de estrellas por restaurante (público). */
   ratingStats(): Promise<Record<number, RatingStats>>;
@@ -96,13 +99,16 @@ export interface Api {
   getSession(): Promise<Session | null>;
   onSessionChange(cb: (session: Session | null) => void): () => void;
   getProfile(userId: string): Promise<Profile | null>;
-  /** identifier: email o nombre de usuario. */
-  signIn(identifier: string, password: string): Promise<void>;
+  /**
+   * identifier: email o nombre de usuario.
+   * captchaToken (acá y abajo): verificación anti-bots de un solo uso (components/captcha), si está configurada.
+   */
+  signIn(identifier: string, password: string, captchaToken?: string): Promise<void>;
   /** Devuelve true si el usuario tiene que confirmar su email antes de entrar. */
-  signUp(email: string, username: string, password: string): Promise<{ needsConfirmation: boolean }>;
+  signUp(email: string, username: string, password: string, captchaToken?: string): Promise<{ needsConfirmation: boolean }>;
   signOut(): Promise<void>;
   /** Manda el email con el link para elegir una contraseña nueva. */
-  requestPasswordReset(email: string): Promise<void>;
+  requestPasswordReset(email: string, captchaToken?: string): Promise<void>;
   /** Cambia la contraseña del usuario logueado (también tras abrir el link de recuperación). */
   updatePassword(password: string): Promise<void>;
   /** Borra la cuenta y sus datos personales. Sus lugares publicados quedan sin autor. */

@@ -110,7 +110,7 @@ function ReviewCard({ restaurant: r }: { restaurant: PendingRestaurant }) {
               variant="danger"
               icon="close"
               loading={busy}
-              onPress={() => review.mutate({ id: r.id, decision: 'rejected', note })}
+              onPress={() => review.mutate({ id: r.id, decision: 'rejected', note, seenAt: r.updated_at })}
               style={{ flex: 1 }}
             />
           </View>
@@ -123,7 +123,7 @@ function ReviewCard({ restaurant: r }: { restaurant: PendingRestaurant }) {
             variant="success"
             icon="checkmark"
             loading={busy}
-            onPress={() => review.mutate({ id: r.id, decision: 'approved' })}
+            onPress={() => review.mutate({ id: r.id, decision: 'approved', seenAt: r.updated_at })}
             style={{ flex: 1 }}
           />
         </View>

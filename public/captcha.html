@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>Verificación</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: transparent;
+      }
+      #widget {
+        display: flex;
+        justify-content: center;
+      }
+    </style>
+    <!-- Página que la app nativa carga en un WebView para resolver la verificación de Cloudflare Turnstile
+         (src/components/captcha/index.tsx). No tiene scripts en línea: la CSP del sitio no los permite. -->
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" defer></script>
+    <script src="/captcha.js" defer></script>
+  </head>
+  <body>
+    <div id="widget"></div>
+  </body>
+</html>

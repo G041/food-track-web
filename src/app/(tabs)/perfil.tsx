@@ -1,9 +1,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
 import { AdminNotes } from '@/components/admin-notes';
+import { Captcha, type CaptchaHandle } from '@/components/captcha';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { FadeIn } from '@/components/motion';
 import { useDebugPanel } from '@/components/safe-area-debug';
@@ -307,8 +308,10 @@ function AuthForm() {
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const captcha = useRef<CaptchaHandle>(null);
 
   async function submit() {
+    if (loading) return; // un pedido a la vez (Enter repetido, doble toque)
     setError(null);
     setInfo(null);
     const id = email.trim();
@@ -320,15 +323,19 @@ function AuthForm() {
     if (mode === 'signup' && !/^[A-Za-z0-9_.]{4,15}$/.test(username)) {
       return setError('El usuario debe tener entre 4 y 15 caracteres (letras, números, punto o guion bajo).');
     }
+    // Las cuentas nuevas piden 8; al ingresar se aceptan las contraseñas de 6 que ya existen.
+    if (mode === 'signup' && password.length < 8) return setError('La contraseña debe tener al menos 8 caracteres.');
     if (password.length < 6) return setError('La contraseña debe tener al menos 6 caracteres.');
     if (mode === 'signup' && password !== password2) return setError('Las contraseñas no coinciden.');
 
     setLoading(true);
     try {
+      // Verificación anti-bots (si está configurada): un token nuevo por intento.
+      const captchaToken = await captcha.current?.getToken();
       if (mode === 'login') {
-        await api.signIn(email, password);
+        await api.signIn(email, password, captchaToken);
       } else {
-        const { needsConfirmation } = await api.signUp(email, username, password);
+        const { needsConfirmation } = await api.signUp(email, username, password, captchaToken);
         if (needsConfirmation) {
           setInfo('¡Cuenta creada! Te mandamos un email para confirmarla antes de ingresar.');
           setMode('login');
@@ -429,6 +436,7 @@ function AuthForm() {
         )}
         {error && <Notice tone="error">{error}</Notice>}
         {info && <Notice tone="success">{info}</Notice>}
+        {!isDemo && <Captcha ref={captcha} />}
         <Button title={mode === 'login' ? 'Ingresar' : 'Crear cuenta'} loading={loading} onPress={submit} />
       </Card>
       </FadeIn>

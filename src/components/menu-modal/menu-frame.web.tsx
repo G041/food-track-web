@@ -6,7 +6,7 @@ export default function MenuFrame(props: MenuFrameProps) {
   return <ZoomableMenuFrame key={props.src} {...props} />;
 }
 
-function ZoomableMenuFrame({ src, sandboxed, onLoad }: MenuFrameProps) {
+function ZoomableMenuFrame({ src, onLoad }: MenuFrameProps) {
   const [scale, setScale] = useState(1);
   const [scrollLeft, setScrollLeft] = useState(0);
   const viewport = useRef<HTMLDivElement>(null);
@@ -38,9 +38,10 @@ function ZoomableMenuFrame({ src, sandboxed, onLoad }: MenuFrameProps) {
             src={src}
             title="Menú del restaurante"
             onLoad={onLoad}
-            // No allow-top-navigation: el sitio no puede sacar al usuario de la app.
-            // Los PDF de escritorio necesitan el visor sin sandbox.
-            sandbox={sandboxed ? 'allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-forms' : undefined}
+            // Siempre aislado. No allow-top-navigation: el sitio no puede sacar al usuario de la app
+            // (ni llevarlo a una página falsa de login). Los PDF se muestran con un visor HTML por eso mismo:
+            // el visor nativo del navegador no funciona dentro de un sandbox.
+            sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-forms"
             referrerPolicy="no-referrer"
             style={{ border: 0, width: size.width, height: size.height, backgroundColor: '#fff', transform: `scale(${scale})`, transformOrigin: 'top left' }}
           />}

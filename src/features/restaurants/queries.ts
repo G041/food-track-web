@@ -97,9 +97,10 @@ export const useDeleteNote = () => useNotesMutation((id: number) => api.deleteNo
 export function useReviewRestaurant() {
   const onSuccess = useInvalidateRestaurants();
   return useMutation({
-    mutationFn: (v: { id: number; decision: ReviewDecision; note?: string }) =>
-      api.review(v.id, v.decision, v.note),
-    onSuccess,
+    mutationFn: (v: { id: number; decision: ReviewDecision; note?: string; seenAt?: string }) =>
+      api.review(v.id, v.decision, v.note, v.seenAt),
+    // También al fallar: si el autor editó el aporte, hay que volver a traerlo para revisarlo de nuevo.
+    onSettled: onSuccess,
   });
 }
 

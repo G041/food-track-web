@@ -145,7 +145,7 @@ function MenuSheet({ target, onClose }: { target: MenuTarget; onClose: () => voi
         ]}>
         <View style={styles.body}>
           {showFrame && (
-            <MenuFrame src={src} sandboxed={preview?.kind !== 'pdf' || !wide} onLoad={() => setLoaded(true)} />
+            <MenuFrame src={src} onLoad={() => setLoaded(true)} />
           )}
 
           {(phase === 'checking' || phase === 'loading') && (
@@ -332,12 +332,14 @@ function safeHost(url: string) {
 }
 
 /**
- * URL final del iframe/WebView. Los PDF en pantallas chicas van por el visor de Google (los navegadores
- * móviles y el WebView de Android no los muestran embebidos); el WebView de iOS sí los abre directo.
+ * URL final del iframe/WebView. En web los PDF van siempre por el visor de Google: el iframe está aislado
+ * (sandbox) y el visor nativo del navegador no funciona ahí adentro; sin sandbox, un sitio que se hace
+ * pasar por PDF podría navegar la app entera. En nativo, igual en pantallas chicas de Android (su WebView
+ * no muestra PDF embebidos); el WebView de iOS sí los abre directo.
  */
 function frameSrc(original: string, preview: MenuPreview | null | undefined, wide: boolean) {
   const url = preview?.embedUrl ?? original;
-  if (preview?.kind === 'pdf' && !wide && Platform.OS !== 'ios') {
+  if (preview?.kind === 'pdf' && (Platform.OS === 'web' || (!wide && Platform.OS !== 'ios'))) {
     return `https://docs.google.com/viewer?embedded=true&url=${encodeURIComponent(url)}`;
   }
   if (preview?.kind === 'pdf') {

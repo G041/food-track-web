@@ -15,7 +15,8 @@ const ok = (cond, msg) => { console.log((cond ? 'OK  ' : 'FAIL') + ' ' + msg); i
 const q = async (sql, params) => (await db.query(sql, params)).rows;
 const as = async (uid, fn) => {
   await db.exec(uid ? `set role authenticated; select set_config('request.jwt.claim.sub','${uid}',false);` : `set role anon; select set_config('request.jwt.claim.sub','',false);`);
-  try { return await fn(); } finally { await db.exec('reset role;'); }
+  // Al salir se limpia también el usuario: lo que corre fuera de as() imita a la clave secreta (auth.uid() nulo).
+  try { return await fn(); } finally { await db.exec(`reset role; select set_config('request.jwt.claim.sub','',false);`); }
 };
 const err = async (fn) => { try { await fn(); return null; } catch (e) { return e; } };
 
@@ -84,9 +85,15 @@ ok((await as(bob, () => q(`delete from restaurants where id=$1 returning id`, [r
 const [ra] = await ins(admin, 'https://admin.com/menu');
 ok(ra.status === 'approved', 'aporte de admin se publica directo');
 
-for (let i = 0; i < 9; i++) await ins(bob, `https://spam.com/${i}`);
+// El límite cuenta envíos (no filas): bob ya hizo 2 (uno rechazado y uno retirado), le quedan 8.
+for (let i = 0; i < 8; i++) await ins(bob, `https://spam.com/${i}`);
 const spam = await err(() => ins(bob, 'https://spam.com/10'));
 ok(/límite/.test(spam?.message ?? ''), `límite de 10 aportes por día (${spam?.message})`);
+await as(bob, () => q(`update restaurants set created_at = now() - interval '2 days' where submitted_by = $1 and status = 'pending'`, [bob]));
+ok(!!(await err(() => ins(bob, 'https://spam.com/11'))), 'cambiar created_at de los propios aportes no reinicia el límite');
+await as(bob, () => q(`delete from restaurants where submitted_by = $1 and status = 'pending'`, [bob]));
+ok(!!(await err(() => ins(bob, 'https://spam.com/12'))), 'retirar aportes no reinicia el límite');
+ok(!!(await err(() => as(bob, () => q(`delete from submission_log`)))), 'el registro de envíos no se puede tocar desde el cliente');
 
 const near = await as(null, () => q(`select name from restaurants_nearby(-34.6037, -58.3816, 1500)`));
 ok(near.length > 0 && near.length < 28, `restaurants_nearby devuelve los cercanos (${near.length}: ${near.slice(0, 3).map((r) => r.name).join(', ')}…)`);
@@ -163,12 +170,58 @@ ok((await as(bob, () => q(`update profiles set role = 'user' where id = $1 retur
 await as(admin, () => q(`select set_user_banned($1, false)`, [bob]));
 ok((await q(`select role from profiles where id = $1`, [bob]))[0].role === 'user', 'admin desbloquea a un usuario');
 
+// ── Endurecimiento de seguridad (migración 20261112000000) ──
+ok((await err(() => mk('ALICE')))?.code === '23505', 'no se registra un usuario que solo difiere en mayúsculas');
+
+ok(!!(await err(() => as(null, () => q(`select role from profiles`)))), 'anónimo no puede leer roles');
+ok(!!(await err(() => as(alice, () => q(`select role from profiles where id = $1`, [admin])))), 'usuario común no puede leer el rol de otros');
+ok((await as(null, () => q(`select username, points from profiles`))).length >= 3, 'usuario y puntos siguen siendo públicos');
+ok((await as(alice, () => q(`select role from my_profile()`)))[0]?.role === 'user', 'cada usuario ve su propio rol con my_profile');
+ok((await as(admin, () => q(`select role from my_profile()`)))[0]?.role === 'admin', 'my_profile devuelve admin al admin');
+ok(!!(await err(() => as(alice, () => q(`select * from user_roles($1)`, [[admin]])))), 'usuario común no puede usar user_roles');
+ok((await as(admin, () => q(`select role from user_roles($1)`, [[alice]])))[0]?.role === 'user', 'admin consulta roles con user_roles');
+ok(!!(await err(() => as(null, () => q(`select * from my_profile()`)))), 'anónimo no puede ejecutar my_profile');
+
+ok(!!(await err(() => as(null, () => q(`select submitted_by from restaurants limit 1`)))), 'anónimo no ve quién aportó cada lugar');
+ok(!!(await err(() => as(null, () => q(`select review_note, reviewed_by from restaurants limit 1`)))), 'anónimo no ve datos de moderación');
+ok((await as(null, () => q(`select id, name, category, address, menu_url, latitude, longitude, status, created_at from restaurants`))).length > 0, 'anónimo sigue viendo los datos públicos de los lugares');
+
+// Revisión: se aprueba solo lo que el admin vio.
+const [bait] = await ins(alice, 'https://legit.example/menu');
+const [seen] = await as(admin, () => q(`select updated_at from restaurants where id = $1`, [bait.id]));
+await as(alice, () => q(`update restaurants set menu_url = 'https://otro.example/menu' where id = $1`, [bait.id]));
+const stale = await err(() => as(admin, () => q(`select review_restaurant($1, 'approved', null, $2)`, [bait.id, seen.updated_at])));
+ok(/cambió/.test(stale?.message ?? ''), `no se aprueba un aporte editado después de verlo (${stale?.message})`);
+ok((await q(`select status from restaurants where id = $1`, [bait.id]))[0].status === 'pending', 'el aporte editado sigue pendiente');
+const [seen2] = await as(admin, () => q(`select updated_at from restaurants where id = $1`, [bait.id]));
+await as(admin, () => q(`select review_restaurant($1, 'approved', null, $2)`, [bait.id, seen2.updated_at]));
+ok((await q(`select status from restaurants where id = $1`, [bait.id]))[0].status === 'approved', 'con la versión actual a la vista, se aprueba');
+
+// Un bloqueado no edita los aportes que ya tenía pendientes.
+const [bobPending] = await as(admin, () => q(`insert into restaurants (name,category,menu_url,latitude,longitude) values ('Lugar','bar','https://bob.example/p',-34.6,-58.4) returning id`));
+await q(`update restaurants set status = 'pending', submitted_by = $1 where id = $2`, [bob, bobPending.id]);
+await as(admin, () => q(`select set_user_banned($1, true)`, [bob]));
+ok(/bloqueada/.test((await err(() => as(bob, () => q(`update restaurants set name = 'Otro' where id = $1`, [bobPending.id]))))?.message ?? ''), 'usuario bloqueado no puede editar sus pendientes');
+await as(admin, () => q(`select set_user_banned($1, false)`, [bob]));
+
+// Tope diario de reportes.
+const flood = await mk('flood');
+const approvedIds = (await q(`select id from restaurants where status = 'approved' order by id limit 21`)).map((r) => r.id);
+for (const id of approvedIds.slice(0, 20)) await report(flood, id);
+const tooMany = await err(() => report(flood, approvedIds[20]));
+ok(/límite de 20 reportes/.test(tooMany?.message ?? ''), `límite de 20 reportes por día (${tooMany?.message})`);
+
+ok(!!(await err(() => as(alice, () => q(`select count(*) from login_attempts`)))), 'los intentos de login no se ven desde el cliente');
+ok(!!(await err(() => as(alice, () => q(`insert into login_attempts (username) values ('x')`)))), 'los intentos de login no se escriben desde el cliente');
+
 // ── Borrar cuenta (lo que hace api/delete-account con la clave secreta) ──
 await q(`delete from restaurants where submitted_by = $1 and status <> 'approved'`, [alice]);
 await q(`delete from auth.users where id = $1`, [alice]);
 ok((await q(`select count(*)::int n from profiles where id = $1`, [alice]))[0].n === 0, 'borrar el usuario borra su perfil');
 ok((await q(`select count(*)::int n from ratings where user_id = $1`, [alice]))[0].n === 0, 'borrar el usuario borra sus calificaciones');
-ok((await q(`select submitted_by from restaurants where id = $1`, [r1.id]))[0].submitted_by === null, 'sus lugares publicados quedan sin autor');
+const [orphan] = await q(`select submitted_by, status from restaurants where id = $1`, [r1.id]);
+ok(orphan.submitted_by === null, 'sus lugares publicados quedan sin autor');
+ok(orphan.status === 'approved', 'sus lugares publicados siguen publicados');
 ok((await q(`select count(*)::int n from restaurants where id = $1`, [pendingR.id]))[0].n === 0, 'sus aportes pendientes se borran');
 
 console.log(fails ? `\n${fails} FALLAS` : '\nTODO OK');

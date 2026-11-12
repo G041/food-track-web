@@ -8,6 +8,7 @@ import {
   type Api,
   type OpenReport,
   type PendingRestaurant,
+  type Profile,
   type RatingStats,
   type Restaurant,
 } from './types';
@@ -15,6 +16,9 @@ import {
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? '';
 // Adonde llevan los links de los emails (recuperar contraseña): siempre la web, también desde la app nativa.
 const SITE_URL = Platform.OS === 'web' && typeof location !== 'undefined' ? location.origin : API_URL;
+
+/** PostgREST: la función (con esos parámetros) no existe en la base. */
+const MISSING_FUNCTION = 'PGRST202';
 
 export function createSupabaseApi(url: string, key: string): Api {
   const supabase = createClient(url, key, {
@@ -43,6 +47,8 @@ export function createSupabaseApi(url: string, key: string): Api {
   }
 
   function authFail(message: string): never {
+    if (/captcha/i.test(message)) throw new ApiError('No pudimos verificar que sos una persona. Probá de nuevo.');
+    if (/rate limit|too many/i.test(message)) throw new ApiError('Demasiados intentos. Esperá unos minutos.');
     if (/invalid login credentials/i.test(message)) throw new ApiError('Usuario o contraseña incorrectos.');
     if (/email not confirmed/i.test(message)) throw new ApiError('Confirmá tu email antes de ingresar.');
     if (/already registered/i.test(message)) throw new ApiError('Ese email ya tiene una cuenta.');
@@ -54,11 +60,12 @@ export function createSupabaseApi(url: string, key: string): Api {
     async listApproved() {
       const { data, error } = await supabase
         .from('restaurants')
-        .select('*')
+        // Solo las columnas públicas: quién aportó o revisó cada lugar no se expone a visitantes sin sesión.
+        .select('id, name, category, address, menu_url, latitude, longitude, status, created_at')
         .eq('status', 'approved')
         .order('name');
       if (error) fail(error);
-      return data as Restaurant[];
+      return (data ?? []).map((r) => ({ ...r, submitted_by: null, reviewed_at: null, review_note: null })) as Restaurant[];
     },
 
     async listMine(userId) {
@@ -102,12 +109,12 @@ export function createSupabaseApi(url: string, key: string): Api {
       if (!data?.length) throw new ApiError('No pudimos eliminar el menú. Revisá que seas administrador.');
     },
 
-    async review(id, decision, note) {
-      const { error } = await supabase.rpc('review_restaurant', {
-        p_id: id,
-        p_decision: decision,
-        p_note: note ?? null,
-      });
+    async review(id, decision, note, seenAt) {
+      const args = { p_id: id, p_decision: decision, p_note: note ?? null };
+      // p_seen_at: la base rechaza la revisión si el autor editó el aporte después de que el admin lo abrió.
+      let { error } = await supabase.rpc('review_restaurant', seenAt ? { ...args, p_seen_at: seenAt } : args);
+      // Base sin la migración de seguridad (la función todavía no acepta p_seen_at).
+      if (error?.code === MISSING_FUNCTION && seenAt) ({ error } = await supabase.rpc('review_restaurant', args));
       if (error) fail(error);
     },
 
@@ -188,11 +195,21 @@ export function createSupabaseApi(url: string, key: string): Api {
         .from('reports')
         .select(
           'id, reason, detail, created_at, reporter:profiles!reports_reported_by_fkey(username), ' +
-            'restaurant:restaurants(id, name, menu_url, category, submitted_by, submitter:profiles!restaurants_submitted_by_fkey(username, role))',
+            'restaurant:restaurants(id, name, menu_url, category, submitted_by, submitter:profiles!restaurants_submitted_by_fkey(username))',
         )
         .eq('status', 'open')
         .order('created_at');
       if (error) fail(error);
+      // El rol no es una columna pública: los admins lo consultan aparte.
+      const authorIds = [
+        ...new Set(((data ?? []) as unknown as { restaurant: { submitted_by: string | null } }[]).map((r) => r.restaurant.submitted_by)),
+      ].filter((id): id is string => !!id);
+      const banned = new Set<string>();
+      if (authorIds.length) {
+        const { data: roles, error: rolesError } = await supabase.rpc('user_roles', { p_ids: authorIds });
+        if (rolesError && rolesError.code !== MISSING_FUNCTION) fail(rolesError);
+        for (const r of (roles ?? []) as { id: string; role: string }[]) if (r.role === 'banned') banned.add(r.id);
+      }
       type Row = {
         id: number;
         reason: OpenReport['reason'];
@@ -200,13 +217,17 @@ export function createSupabaseApi(url: string, key: string): Api {
         created_at: string;
         reporter: { username: string } | null;
         restaurant: Omit<OpenReport['restaurant'], 'submitter' | 'submitterBanned'> & {
-          submitter: { username: string; role: string } | null;
+          submitter: { username: string } | null;
         };
       };
       return ((data ?? []) as unknown as Row[]).map(({ reporter, restaurant: { submitter, ...restaurant }, ...r }) => ({
         ...r,
         reporter: reporter?.username ?? null,
-        restaurant: { ...restaurant, submitter: submitter?.username ?? null, submitterBanned: submitter?.role === 'banned' },
+        restaurant: {
+          ...restaurant,
+          submitter: submitter?.username ?? null,
+          submitterBanned: !!restaurant.submitted_by && banned.has(restaurant.submitted_by),
+        },
       }));
     },
 
@@ -239,6 +260,11 @@ export function createSupabaseApi(url: string, key: string): Api {
     },
 
     async getProfile(userId) {
+      // El rol solo lo puede leer su dueño, a través de my_profile() (no es una columna pública).
+      const { data: mine, error: rpcError } = await supabase.rpc('my_profile');
+      if (!rpcError) return ((mine ?? []) as Profile[])[0] ?? null;
+      if (rpcError.code !== MISSING_FUNCTION) fail(rpcError);
+      // Base sin la migración de seguridad: lectura directa, como antes.
       const { data, error } = await supabase
         .from('profiles')
         .select('id, username, role, points')
@@ -248,10 +274,10 @@ export function createSupabaseApi(url: string, key: string): Api {
       return data;
     },
 
-    async signIn(identifier, password) {
+    async signIn(identifier, password, captchaToken) {
       const id = identifier.trim();
       if (id.includes('@')) {
-        const { error } = await supabase.auth.signInWithPassword({ email: id, password });
+        const { error } = await supabase.auth.signInWithPassword({ email: id, password, options: { captchaToken } });
         if (error) authFail(error.message);
         return;
       }
@@ -261,7 +287,7 @@ export function createSupabaseApi(url: string, key: string): Api {
         res = await fetch(`${API_URL}/api/login`, {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ username: id, password }),
+          body: JSON.stringify({ username: id, password, captchaToken }),
         });
       } catch {
         throw new ApiError('No pudimos conectar. Probá de nuevo.');
@@ -277,7 +303,7 @@ export function createSupabaseApi(url: string, key: string): Api {
       if (error) authFail(error.message);
     },
 
-    async signUp(email, username, password) {
+    async signUp(email, username, password, captchaToken) {
       const { data: available, error: rpcError } = await supabase.rpc('username_available', {
         p_username: username,
       });
@@ -287,7 +313,7 @@ export function createSupabaseApi(url: string, key: string): Api {
       const { data, error } = await supabase.auth.signUp({
         email: email.trim(),
         password,
-        options: { data: { username } },
+        options: { data: { username }, captchaToken },
       });
       if (error) authFail(error.message);
       return { needsConfirmation: !data.session };
@@ -297,8 +323,11 @@ export function createSupabaseApi(url: string, key: string): Api {
       await supabase.auth.signOut();
     },
 
-    async requestPasswordReset(email) {
-      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: `${SITE_URL}/nueva-clave` });
+    async requestPasswordReset(email, captchaToken) {
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: `${SITE_URL}/nueva-clave`,
+        captchaToken,
+      });
       if (error && /rate limit/i.test(error.message)) throw new ApiError('Demasiados intentos. Esperá unos minutos.');
       if (error) authFail(error.message);
     },
